@@ -1,6 +1,7 @@
 import com.gravitysim.core.Body;
 import com.gravitysim.core.Vector2D;
 import com.gravitysim.tree.BoundingBox;
+import com.gravitysim.tree.QuadTreeNode;
 
 public class TestMain {
 	public static void main(String[] args) {
@@ -54,6 +55,28 @@ public class TestMain {
 		// verify children tile perfectly — no gaps, no overlaps
 		// NW should contain top-left quadrant
 		System.out.println(children[0].contains(new Vector2D(-25, 25)));  // true
-		System.out.println(children[0].contains(new Vector2D( 25, 25)));  // false — belongs to NE
+		System.out.println(children[0].contains(new Vector2D( 25, 25)));  // false — belongs to N
+		System.out.println();
+		
+		//QuadTree Class Testing
+		System.out.println("Begin: QuadTreeNode class test");
+		BoundingBox root = new BoundingBox(0, 0, 500);
+		QuadTreeNode node = new QuadTreeNode(root);
+
+		Body a = new Body(new Vector2D(-100,  100), Vector2D.zero(), 1e10, 5);
+		Body b = new Body(new Vector2D( 100, -100), Vector2D.zero(), 1e10, 5);
+		Body c = new Body(new Vector2D(   0,    0), Vector2D.zero(), 1e10, 5);
+
+		node.insert(a);
+		System.out.println(node.isLeaf());      // true  — one body
+		node.insert(b);
+		System.out.println(node.isInternal());  // true  — subdivided
+		node.insert(c);
+
+		System.out.println(node.totalMass);     // 3e10
+		System.out.println(node.centerOfMass); // (0.000, 0.000) — symmetric arrangement
+
+		Vector2D force = node.calculateForce(a, 0.5, 6.674e-11, 0.1);
+		System.out.println(force);             // non-zero vector pulling a toward center
 	}
 }
