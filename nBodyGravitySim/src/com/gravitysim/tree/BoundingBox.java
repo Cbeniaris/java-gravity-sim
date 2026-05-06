@@ -38,4 +38,9 @@ public class BoundingBox {
 	public double size() {
 		return halfWidth * 2.0;
 	}
+	
+	@Override
+	public String toString() {
+		return String.format("BoundingBox[center=%.1f, %.1f half = %.1f]",  x, y, halfWidth);
+	}
 }
