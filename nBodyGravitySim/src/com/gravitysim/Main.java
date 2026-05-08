@@ -18,13 +18,17 @@ public class Main {
 		double G = 6.674e-11;
 		double M = 1.989e30; // star mass
 
-		// Planet orbital parameters — {radius in AU, mass in kg, start angle in degrees}
+		// Planet orbital parameters — {radius in AU, mass in kg, start angle in degrees, Body Radius}
 		double[][] planets = {
 		    { 0.4 * 1.496e11, 3.3e23,   0,   2.5e9 },  // Mercury
 		    { 0.7 * 1.496e11, 4.87e24,  90,  6.0e9 },  // Venus
 		    { 1.0 * 1.496e11, 5.97e24,  180, 6.4e9 },  // Earth
 		    { 1.5 * 1.496e11, 6.39e23,  270, 3.4e9 },  // Mars
-		    { 5.2 * 1.496e11, 1.898e27, 45,  7.0e9 }  // Jupiter
+		    { 5.2 * 1.496e11, 1.898e27, 45,  7.0e9 },  // Jupiter
+		    { 9.58 * 1.496e11, 5.86e26, 120,  5.8232e9 },  // Saturn
+		    { 19.2 * 1.496e11, 8.68e25, 120,  2.5559e9 },  // Neptune
+		    { 30.1 * 1.496e11, 1.024e26, 300,  2.4764e9 },  // Neptune
+		    { 40 * 1.496e11, 1.31e22, 230,  1.15e8 },  // Pluto
 		};
 
 		// Calculate total momentum of all planets first

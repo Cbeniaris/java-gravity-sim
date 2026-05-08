@@ -98,7 +98,7 @@ public class SimulationRenderer {
 	//body rendering
 	
 	private void renderBodies(List<Body> bodies) {
-		int segments = 24; // 24 triangles per circle — smooth enough at all zoom levels
+		int segments = 48; // 24 triangles per circle — smooth enough at all zoom levels
 
 	    // Pre-calculate total float count so we allocate once
 	    int totalFloats = bodies.size() * segments * 9; // 3 verts * 3 floats per circle segment
