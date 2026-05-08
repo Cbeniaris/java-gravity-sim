@@ -1,21 +1,89 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
   <modelVersion>4.0.0</modelVersion>
   <groupId>nBodyGravitySim</groupId>
   <artifactId>nBodyGravitySim</artifactId>
   <version>0.0.1-SNAPSHOT</version>
-   <dependencies>
-        <dependency>
-		    <groupId>org.joml</groupId>
-		    <artifactId>joml</artifactId>
-		    <version>1.10.5</version>
-		</dependency>
-		<dependency>
-		    <groupId>io.github.spair</groupId>
-		    <artifactId>imgui-java-app</artifactId>
-		    <version>1.86.11</version>
-		</dependency>
-    </dependencies>
-  
+
+  <properties>
+    <lwjgl.version>3.3.4</lwjgl.version>
+    <!-- Change this to linux, macos, or windows to match your OS -->
+    <lwjgl.natives>natives-linux</lwjgl.natives>
+  </properties>
+
+  <dependencies>
+
+    <!-- JOML -->
+    <dependency>
+      <groupId>org.joml</groupId>
+      <artifactId>joml</artifactId>
+      <version>1.10.5</version>
+    </dependency>
+
+    <!-- ImGui -->
+    <dependency>
+      <groupId>io.github.spair</groupId>
+      <artifactId>imgui-java-app</artifactId>
+      <version>1.86.11</version>
+    </dependency>
+
+    <!-- LWJGL core -->
+    <dependency>
+      <groupId>org.lwjgl</groupId>
+      <artifactId>lwjgl</artifactId>
+      <version>${lwjgl.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.lwjgl</groupId>
+      <artifactId>lwjgl</artifactId>
+      <version>${lwjgl.version}</version>
+      <classifier>${lwjgl.natives}</classifier>
+    </dependency>
+
+    <!-- LWJGL GLFW -->
+    <dependency>
+      <groupId>org.lwjgl</groupId>
+      <artifactId>lwjgl-glfw</artifactId>
+      <version>${lwjgl.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.lwjgl</groupId>
+      <artifactId>lwjgl-glfw</artifactId>
+      <version>${lwjgl.version}</version>
+      <classifier>${lwjgl.natives}</classifier>
+    </dependency>
+
+    <!-- LWJGL OpenGL -->
+    <dependency>
+      <groupId>org.lwjgl</groupId>
+      <artifactId>lwjgl-opengl</artifactId>
+      <version>${lwjgl.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.lwjgl</groupId>
+      <artifactId>lwjgl-opengl</artifactId>
+      <version>${lwjgl.version}</version>
+      <classifier>${lwjgl.natives}</classifier>
+    </dependency>
+
+    <!-- LWJGL STB -->
+    <dependency>
+      <groupId>org.lwjgl</groupId>
+      <artifactId>lwjgl-stb</artifactId>
+      <version>${lwjgl.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.lwjgl</groupId>
+      <artifactId>lwjgl-stb</artifactId>
+      <version>${lwjgl.version}</version>
+      <classifier>${lwjgl.natives}</classifier>
+    </dependency>
+
+  </dependencies>
+
   <build>
     <sourceDirectory>src</sourceDirectory>
     <plugins>
@@ -23,9 +91,21 @@
         <artifactId>maven-compiler-plugin</artifactId>
         <version>3.13.0</version>
         <configuration>
-          <release>24</release>
+          <release>21</release>
         </configuration>
       </plugin>
+
+      <!-- JVM flags applied at runtime via maven -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>3.1.0</version>
+        <configuration>
+          <mainClass>com.gravitysim.Main</mainClass>
+        </configuration>
+      </plugin>
+
     </plugins>
   </build>
+
 </project>

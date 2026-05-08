@@ -32,7 +32,7 @@ public class QuadTree {
 	//force calculation
 	public Vector2D calculateForce(Body b, double G, double epsilon) {
 		if (root == null) { return Vector2D.zero(); }
-		return root.calculateForce(b, epsilon, G, epsilon);
+		return root.calculateForce(b, theta, G, epsilon);
 	}
 
 	private BoundingBox computeBoundary(List<Body> bodies) {
@@ -57,6 +57,7 @@ public class QuadTree {
 		double centerY = (minY + maxY) / 2.0;
 		double halfWidth = Math.max(maxX - minX,  maxY - minY) / 2.0 * 1.05;
 		// 1.05 padding makes sure the bodies on the exact edge are sfely inside the boundary after floating point math
+		halfWidth = Math.max(halfWidth, rootSize);  // never collapse to zero
 		
 		return new BoundingBox(centerX, centerY, halfWidth);
 	}
