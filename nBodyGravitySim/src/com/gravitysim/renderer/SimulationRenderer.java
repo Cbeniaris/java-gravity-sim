@@ -71,7 +71,6 @@ public class SimulationRenderer {
 		
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		glPointSize(2.0f);
 	}
 	
 	//main render call
@@ -99,13 +98,49 @@ public class SimulationRenderer {
 	//body rendering
 	
 	private void renderBodies(List<Body> bodies) {
-		float[] verts = new float[bodies.size() * 3];
-		for (int i = 0; i < bodies.size(); i++) {
-			verts[i * 3] = (float) (bodies.get(i).position.x * WORLD_SCALE);
-			verts[i * 3 + 1] = (float) (bodies.get(i).position.y * WORLD_SCALE);
-			verts[i * 3 + 2] = 0.0f;
-		}
-		uploadAndDraw(verts, GL_POINTS, 1.0f, 1.0f, 1.0f, 1.0f);
+		int segments = 24; // 24 triangles per circle — smooth enough at all zoom levels
+
+	    // Pre-calculate total float count so we allocate once
+	    int totalFloats = bodies.size() * segments * 9; // 3 verts * 3 floats per circle segment
+	    float[] verts = new float[totalFloats];
+	    int offset = 0;
+
+	    for (Body b : bodies) {
+	        float cx     = (float)(b.position.x * WORLD_SCALE);
+	        float cy     = (float)(b.position.y * WORLD_SCALE);
+	        float radius = (float)(b.radius * WORLD_SCALE);
+
+	        float[] circle = generateCircle(cx, cy, radius, segments);
+	        System.arraycopy(circle, 0, verts, offset, circle.length);
+	        offset += circle.length;
+	    }
+
+	    uploadAndDraw(verts, GL_TRIANGLES, 1.0f, 1.0f, 1.0f, 1.0f);
+	}
+	
+	private float[] generateCircle(float cx, float cy, float radius, int segments) {
+	    float[] verts = new float[segments * 9]; // segments * 3 vertices * 3 floats
+	    for (int i = 0; i < segments; i++) {
+	        double angle1 = 2 * Math.PI * i / segments;
+	        double angle2 = 2 * Math.PI * (i + 1) / segments;
+	        int idx = i * 9;
+
+	        // Center vertex
+	        verts[idx] = cx;
+	        verts[idx + 1] = cy;
+	        verts[idx + 2] = 0;
+
+	        // Edge vertex 1
+	        verts[idx + 3] = cx + (float)(radius * Math.cos(angle1));
+	        verts[idx + 4] = cy + (float)(radius * Math.sin(angle1));
+	        verts[idx + 5] = 0;
+
+	        // Edge vertex 2
+	        verts[idx + 6] = cx + (float)(radius * Math.cos(angle2));
+	        verts[idx + 7] = cy + (float)(radius * Math.sin(angle2));
+	        verts[idx + 8] = 0;
+	    }
+	    return verts;
 	}
 	
 	//vector rednering
@@ -188,16 +223,16 @@ public class SimulationRenderer {
 		}	
 			
 	// shaders
-	
+		
+		
 		private void setupShaders() {
-	        String vertSrc =
-	            "#version 330 core\n" +
-	            "layout(location = 0) in vec3 aPos;\n" +
-	            "uniform mat4 uMVP;\n" +
-	            "void main() {\n" +
-	            "    gl_Position = uMVP * vec4(aPos, 1.0);\n" +
-	            "    gl_PointSize = 2.0;\n" +
-	            "}\n";
+			String vertSrc =
+			    "#version 330 core\n" +
+			    "layout(location = 0) in vec3 aPos;\n" +
+			    "uniform mat4 uMVP;\n" +
+			    "void main() {\n" +
+			    "    gl_Position = uMVP * vec4(aPos, 1.0);\n" +
+			    "}\n";
 
 	        String fragSrc =
 	            "#version 330 core\n" +
@@ -235,7 +270,7 @@ public class SimulationRenderer {
 
 	    // buffers
 	    private void setupBuffers() {
-	        vao = glGenVertexArrays();
+	    	vao = glGenVertexArrays();
 	        vbo = glGenBuffers();
 
 	        glBindVertexArray(vao);

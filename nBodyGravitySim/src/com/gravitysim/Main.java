@@ -20,11 +20,11 @@ public class Main {
 
 		// Planet orbital parameters — {radius in AU, mass in kg, start angle in degrees}
 		double[][] planets = {
-		    { 0.4  * 1.496e11, 3.3e23,  0   },  // Mercury-like
-		    { 0.7  * 1.496e11, 4.87e24, 90  },  // Venus-like
-		    { 1.0  * 1.496e11, 5.97e24, 180 },  // Earth-like
-		    { 1.5  * 1.496e11, 6.39e23, 270 },  // Mars-like
-		    { 3.5 * 1.496e11, 1.898e27, 45 },  // Jupiter-like
+		    { 0.4 * 1.496e11, 3.3e23,   0,   2.5e9 },  // Mercury
+		    { 0.7 * 1.496e11, 4.87e24,  90,  6.0e9 },  // Venus
+		    { 1.0 * 1.496e11, 5.97e24,  180, 6.4e9 },  // Earth
+		    { 1.5 * 1.496e11, 6.39e23,  270, 3.4e9 },  // Mars
+		    { 5.2 * 1.496e11, 1.898e27, 45,  7.0e9 }  // Jupiter
 		};
 
 		// Calculate total momentum of all planets first
@@ -33,9 +33,10 @@ public class Main {
 
 		List<Body> planetBodies = new ArrayList<>();
 		for (double[] p : planets) {
-		    double r     = p[0];
-		    double mass  = p[1];
+		    double r = p[0];
+		    double mass = p[1];
 		    double angle = Math.toRadians(p[2]);
+		    double radius = p[3];
 
 		    // Position around the star
 		    double px = r * Math.cos(angle);
@@ -43,8 +44,8 @@ public class Main {
 
 		    // Circular orbit velocity — perpendicular to radius
 		    double speed = Math.sqrt(G * M / r);
-		    double vx    = -speed * Math.sin(angle);
-		    double vy    =  speed * Math.cos(angle);
+		    double vx = -speed * Math.sin(angle);
+		    double vy =  speed * Math.cos(angle);
 
 		    totalMomentumX += mass * vx;
 		    totalMomentumY += mass * vy;
@@ -52,7 +53,7 @@ public class Main {
 		    planetBodies.add(new Body(
 		        new Vector2D(px, py),
 		        new Vector2D(vx, vy),
-		        mass, 4
+		        mass, radius
 		    ));
 		}
 
@@ -63,7 +64,7 @@ public class Main {
 		Body star = new Body(
 		    new Vector2D(0, 0),
 		    new Vector2D(starVx, starVy),
-		    M, 10
+		    M, 5.0e10
 		);
 
 		sim.addBody(star);
