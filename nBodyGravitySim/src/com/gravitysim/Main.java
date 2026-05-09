@@ -18,7 +18,7 @@ public class Main {
 		
 		double G = 6.674e-11;
 		double M = 1.989e30; // star mass
-		Random rand = new Random(42); // fixed seed for reproducibility
+		Random rand = new Random(42); // fixed seed for reproducibility 
 
 		// Planet orbital parameters — {radius in AU, mass in kg, start angle in degrees, Body Radius}
 		double[][] planets = {

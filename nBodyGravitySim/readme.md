@@ -11,7 +11,7 @@ A real-time gravitational simulation of the solar system built in Java using Ope
 - Real-time N-body gravitational simulation with accurate Newtonian physics
 - Barnes-Hut quadtree optimization reducing force calculations from O(n²) to O(n log n)
 - Leapfrog integration for long-term orbital stability and energy conservation
-- Full solar system with 8 planets and a 500-body asteroid belt
+- Full solar system with 9 planets (Justice for pluto!) and a 2000-body asteroid belt
 - OpenGL rendering via LWJGL with pan and zoom camera controls
 - Debug overlays for velocity vectors, acceleration vectors, and quadtree visualization
 
