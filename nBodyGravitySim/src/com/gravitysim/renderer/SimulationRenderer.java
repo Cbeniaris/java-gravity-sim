@@ -2,6 +2,7 @@ package com.gravitysim.renderer;
 
 import com.gravitysim.core.Body;
 import com.gravitysim.core.Simulation;
+import com.gravitysim.core.SimulationIO;
 import com.gravitysim.tree.*;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.*;
@@ -61,6 +62,10 @@ public class SimulationRenderer {
 	private int backgroundVao;
 	private int backgroundVbo;
 	private int backgroundShader;
+	
+	//saving and loading
+	private imgui.type.ImString saveFilePath = new imgui.type.ImString("simulation", 128);
+	private String saveStatusMessage = "";
 	
 	
 	//init
@@ -519,7 +524,7 @@ public class SimulationRenderer {
 	    	
 	    	//pin the window to the top left corner
 	    	ImGui.setNextWindowPos(10, 10, imgui.flag.ImGuiCond.Always);
-	    	ImGui.setNextWindowSize(410, 330, imgui.flag.ImGuiCond.Always);
+	    	ImGui.setNextWindowSize(410, 420, imgui.flag.ImGuiCond.Always);
 	    	ImGui.begin("Simulation Controls",
 	    		imgui.flag.ImGuiWindowFlags.NoCollapse |
 	    		imgui.flag.ImGuiWindowFlags.NoResize |
@@ -566,7 +571,42 @@ public class SimulationRenderer {
 	        if (ImGui.button("Reset", 120, 24)) {
 	            sim.reset();
 	        }
-	       
+	        
+	        // Save and Load
+	        ImGui.inputText("File", saveFilePath);
+	        ImGui.spacing();
+	        
+	        if (ImGui.button("Save",84, 24)) {
+	        	try {
+	        		String path = "saves/" + saveFilePath.get() + ".json";
+	        		new java.io.File("saves").mkdirs();
+	        		SimulationIO.save(sim,  path);
+	        		saveStatusMessage = "Saved: " + path;
+	        	} catch (Exception e){
+	        		saveStatusMessage = "Save Failed: " + e.getMessage();
+	        	}
+	        }
+	        
+	        ImGui.sameLine();
+	        if (ImGui.button("Load", 84, 24)) {
+	            try {
+	                String path = "saves/" + saveFilePath.get() + ".json";
+	                SimulationIO.load(sim, path);
+	                saveStatusMessage = "Loaded: " + path;
+	            } catch (Exception e) {
+	                saveStatusMessage = "Load failed: " + e.getMessage();
+	            }
+	        }
+	        ImGui.sameLine();
+	        if (ImGui.button("Clear", 84, 24)) {
+	            sim.clear();
+	            saveStatusMessage = "Simulation cleared";
+	        }
+
+	        if (!saveStatusMessage.isEmpty()) {
+	            ImGui.spacing();
+	            ImGui.textDisabled(saveStatusMessage);
+	        }
 	        
 	        
 	    	//Debug Overlays

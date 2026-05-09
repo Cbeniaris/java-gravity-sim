@@ -98,6 +98,12 @@ public class Simulation {
 		computeAccelerations();
 	}
 	
+	public void clear() {
+		bodies.clear();
+	    tree.build(bodies);
+	    paused = false;
+	}
+	
 	// Setters / getters
 	
 	public List<Body> getBodies() { return bodies; }
@@ -106,4 +112,6 @@ public class Simulation {
 	public void setTheta(double theta) { tree.setTheta(theta); }
 	public boolean isPaused() { return paused; }
 	public void togglePause() { paused = !paused; }
+
+	
 }
