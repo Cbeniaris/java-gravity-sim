@@ -62,7 +62,7 @@ This scheme conserves energy over long periods, keeping orbits stable across tho
 
 ### Barnes-Hut Algorithm
 
-The simple approach to N-body simulation checks every body against every other body to calculate forces — O(n²) complexity. With 500 bodies that's 250,000 force calculations per frame, and with 5,000 bodies it becomes 25,000,000. This quickly scales to the point where your computer will not be happy.
+The simple approach to N-body simulation checks every body against every other body to calculate forces O(n²) complexity. With 500 bodies that's 250,000 force calculations per frame, and with 5,000 bodies it becomes 25,000,000. This quickly scales to the point where your computer will not be happy.
 
 The Barnes-Hut algorithm reduces this to O(n log n) using a quadtree data structure:
 
@@ -78,11 +78,11 @@ Where `s` is the width of the node's region and `d` is the distance from the bod
 
 A `θ` of 0.5 gives a good balance of accuracy and performance. Increasing it toward 1.0 or higher speeds up the simulation at the cost of accuracy. Setting it to 0 degrades to brute force O(n²).
 
-**Result**: At θ = 0.5 with 509 bodies (8 planets + 500 asteroids), Barnes-Hut reduces force calculations from ~259,000 to roughly 5,000–10,000 per frame, enabling smooth real-time simulation.
+**Result**: At θ = 0.5 with 2010 bodies (1 star + 9 planets + 2000 asteroids), Barnes-Hut reduces force calculations from ~4,000,000 to roughly 6000 per frame, enabling smooth real-time simulation.
 
 ### Momentum Conservation
 
-The star is not fixed in place — it responds to the gravitational pull of all planets, most significantly Jupiter. Without correction the entire system would drift off screen over time.
+The star is not fixed in place and it responds to the gravitational pull of all planets, most significantly Jupiter. Without correction the entire system would drift off screen over time.
 
 At initialization the simulation calculates the total momentum of all planets and assigns the star an equal and opposite momentum, ensuring the system's center of mass remains stationary. This produces the subtle stellar wobble seen in the simulation. This is the same effect astronomers use to detect real exoplanets.
 
@@ -93,18 +93,18 @@ At initialization the simulation calculates the total momentum of all planets an
 ```
 src/
 └── com/gravitysim/
-    ├── Main.java                    — Entry point, initial conditions
+    ├── Main.java                    - Entry point, initial conditions
     ├── core/
-    │   ├── Vector2D.java            — 2D math utility
-    │   ├── Body.java                — Particle state and Leapfrog integration
-    │   └── Simulation.java          — Physics loop and timestep management
+    │   ├── Vector2D.java            - 2D math utility
+    │   ├── Body.java                - Particle state and Leapfrog integration
+    │   └── Simulation.java          - Physics loop and timestep management
     ├── tree/
-    │   ├── BoundingBox.java         — Spatial region representation
-    │   ├── QuadTreeNode.java        — Recursive tree node, force calculation
-    │   └── QuadTree.java            — Tree wrapper, boundary computation
+    │   ├── BoundingBox.java         - Spatial region representation
+    │   ├── QuadTreeNode.java        - Recursive tree node, force calculation
+    │   └── QuadTree.java            - Tree wrapper, boundary computation
     └── renderer/
-        ├── Camera.java              — Pan and zoom view matrix
-        └── SimulationRenderer.java  — LWJGL/OpenGL rendering pipeline
+        ├── Camera.java              - Pan and zoom view matrix
+        └── SimulationRenderer.java  - LWJGL/OpenGL rendering pipeline
 ```
 
 ---
@@ -115,7 +115,7 @@ src/
 |---|---|---|
 | LWJGL | 3.3.4 | OpenGL and GLFW bindings |
 | JOML | 1.10.5 | Matrix and vector math for OpenGL |
-| ImGui-java | 1.86.11 | Debug UI overlay (planned) |
+| ImGui-java | 1.86.11 | Runtime control panel and debug UI |
 
 ---
 
@@ -124,7 +124,7 @@ src/
 - Java 21 (LTS)
 - Maven 3.6+
 - A GPU supporting OpenGL 3.3 or higher
-- Linux: X11 display server (Wayland requires the X11 backend hint — already configured)
+- Linux: X11 display server (Wayland requires the X11 backend hint that is already configured)
 
 ---
 
@@ -156,7 +156,7 @@ Or from Eclipse: right-click `Main.java` → Run As → Java Application. Ensure
 
 ## Controls
 
-| Input | Action |  
+| Input | Action |    
 |---|---|  
 | Scroll wheel | Zoom in / out |  
 | Left-click drag | Pan camera |  
@@ -171,24 +171,23 @@ Or from Eclipse: right-click `Main.java` → Run As → Java Application. Ensure
 
 Key simulation parameters can be tuned in `Main.java` and `Simulation.java`:
 
-| Parameter | Location | Default | Effect |
-|---|---|---|---|
-| `G` | `Simulation` | 6.674e-11 | Gravitational constant |
-| `epsilon` | `Simulation` | 1e8 | Softening factor — increase to stabilize close encounters |
-| `dt` | `Simulation` | 3600 | Timestep in seconds (1 hour per step) |
-| `theta` | `QuadTree` | 0.5 | Barnes-Hut accuracy threshold — increase for performance |
-| `asteroidCount` | `Main` | 500 | Number of asteroid belt bodies |
+| Parameter | Location | Default | Effect |  
+|---|---|---|---|  
+| `G` | `Simulation` | 6.674e-11 | Gravitational constant |  
+| `epsilon` | `Simulation` | 1e8 | Softening factor - increase to stabilize close encounters |  
+| `dt` | `Simulation` | 3600 | Timestep in seconds (1 hour per step) |  
+| `theta` | `QuadTree` | 0.5 | Barnes-Hut accuracy threshold - increase for performance |  
+| `asteroidCount` | `Main` | 2000 | Number of asteroid belt bodies |  
 
 ---
 
 ## Performance
 
-Tested with 2009 bodies (9 planets + 2000 asteroids) on an NVIDIA GPU with OpenGL 3.3:
+Tested with 2010 bodies (1 star + 9 planets + 2000 asteroids) on an NVIDIA GPU with OpenGL 3.3:
 
-| Bodies | Algorithm | Force calculations/frame | Performance |
-|---|---|---|---|
-| 2009 | Brute force O(n²) | 4,036,081 | Slow |
-| 2009| Barnes-Hut O(n log n) | ~5,000–10,000 | Smooth real-time |
+| Bodies | Algorithm | Force calculations/frame | Performance |  
+|---|---|---|---|  
+| 2010 | Brute force O(n²) | 4,040,100 | Slow |  
+| 2010 | Barnes-Hut O(n log n) | ~6000 | Smooth real-time |  
 
 Depending on the 'theta' setting, the number of bodies can be increase or decreased to hit a desired framerate.
-
