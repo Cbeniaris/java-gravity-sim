@@ -1,6 +1,6 @@
 # N-Body Gravitational Simulation
 
-A real-time gravitational simulation of the solar system built in Java using OpenGL for rendering. Simulates gravitational interactions between hundreds of bodies including planets and an asteroid belt, optimized using the Barnes-Hut algorithm for near-linear performance scaling.
+A real-time gravitational simulation of the solar system built in Java using OpenGL for rendering. Simulates gravitational interactions between hundreds of bodies including planets and an asteroid belt, optimized using the Barnes-Hut algorithm for near-linear performance scaling. 
 
 ---
 
@@ -12,6 +12,15 @@ A real-time gravitational simulation of the solar system built in Java using Ope
 - Full solar system with 8 planets and a 500-body asteroid belt
 - OpenGL rendering via LWJGL with pan and zoom camera controls
 - Debug overlays for velocity vectors, acceleration vectors, and quadtree visualization
+
+---
+
+## Planned Features
+
+- Creating bodies while the simulation is running.
+- Tweaking time scale during run time.
+- Texturing of bodies dynamically
+- GUI
 
 ---
 

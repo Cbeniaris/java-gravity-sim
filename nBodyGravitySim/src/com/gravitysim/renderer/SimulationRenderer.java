@@ -98,7 +98,7 @@ public class SimulationRenderer {
 	//body rendering
 	
 	private void renderBodies(List<Body> bodies) {
-		int segments = 48; // 24 triangles per circle — smooth enough at all zoom levels
+		int segments = 48; // 48 triangles per circle 
 
 	    // Pre-calculate total float count so we allocate once
 	    int totalFloats = bodies.size() * segments * 9; // 3 verts * 3 floats per circle segment
@@ -110,6 +110,13 @@ public class SimulationRenderer {
 	        float cy     = (float)(b.position.y * WORLD_SCALE);
 	        float radius = (float)(b.radius * WORLD_SCALE);
 
+	        // How many world units correspond to 1 pixel at current zoom
+	        float viewSize = 20.0f / camera.zoom;
+	        float worldUnitsPerPixel = (viewSize * 2) / windowWidth;
+	        float minRadius = 1f * worldUnitsPerPixel; // minimum 1.5 pixels on scree
+	        
+	        radius = Math.max(radius, minRadius);
+	        
 	        float[] circle = generateCircle(cx, cy, radius, segments);
 	        System.arraycopy(circle, 0, verts, offset, circle.length);
 	        offset += circle.length;
