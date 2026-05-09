@@ -56,6 +56,12 @@ public class SimulationRenderer {
 	private ImGuiImplGl3 imguiGl3;
 	private boolean showUI = false;
 	
+	//Background image
+	private int backgroundTexture;
+	private int backgroundVao;
+	private int backgroundVbo;
+	private int backgroundShader;
+	
 	
 	//init
 	
@@ -84,14 +90,18 @@ public class SimulationRenderer {
 		setupShaders();
 		setupBuffers();
 		
+		
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		
+		setupBackground();
+		backgroundTexture = loadTexture("assets/background.jpg");
+		
 		ImGui.createContext();
 		imguiGlfw = new ImGuiImplGlfw();
 		imguiGl3 = new ImGuiImplGl3();
 		imguiGlfw.init(windowHandle, true);
 		imguiGl3.init("#version 330 core");
-		
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	}
 	
 	//main render call
@@ -99,6 +109,10 @@ public class SimulationRenderer {
 	public void render(Simulation sim) {
 		glClearColor(0.05f, 0.05f, 0.08f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
+		
+		//render the background
+		renderBackground();
+		
 		Matrix4f view = camera.getViewMatrix();
 		Matrix4f proj = camera.getProjectionMatrix(windowWidth, windowHeight);
 		Matrix4f mvp = proj.mul(view, new Matrix4f());
@@ -178,7 +192,20 @@ public class SimulationRenderer {
 	    return verts;
 	}
 	
-	//vector rednering
+	//Background Rendering
+	
+	private void renderBackground() {
+		glUseProgram(backgroundShader);
+		glBindVertexArray(backgroundVao);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, backgroundTexture);
+		glUniform1i(glGetUniformLocation(backgroundShader, "uTexture"), 0);
+	    glDrawArrays(GL_TRIANGLES, 0, 6);
+	    glBindVertexArray(0);
+	}
+	
+	
+	//vector rendering
 	
 	private void renderVelocityVectors(List<Body> bodies) {
 		float[] verts = new float[bodies.size() * 6];
@@ -259,7 +286,6 @@ public class SimulationRenderer {
 			
 	// shaders
 		
-		
 		private void setupShaders() {
 			String vertSrc =
 			    "#version 330 core\n" +
@@ -295,6 +321,78 @@ public class SimulationRenderer {
 	        glDeleteShader(vert);
 	        glDeleteShader(frag);
 	    }
+		
+		private void setupBackground() {
+			// Full screen quad — two triangles covering NDC space
+		    float[] verts = {
+		        -1f, -1f, 0f,  0f, 0f,
+		         1f, -1f, 0f,  1f, 0f,
+		         1f,  1f, 0f,  1f, 1f,
+		        -1f, -1f, 0f,  0f, 0f,
+		         1f,  1f, 0f,  1f, 1f,
+		        -1f,  1f, 0f,  0f, 1f,
+		    };
+		    
+		    backgroundVao = glGenVertexArrays();
+		    backgroundVbo = glGenBuffers();
+		    
+		    glBindVertexArray(backgroundVao);
+		    glBindBuffer(GL_ARRAY_BUFFER, backgroundVbo);
+		    
+		    FloatBuffer buf = MemoryUtil.memAllocFloat(verts.length);
+		    buf.put(verts).flip();
+		    glBufferData(GL_ARRAY_BUFFER, buf, GL_STATIC_DRAW);
+		    MemoryUtil.memFree(buf);
+		    
+		    // position attribute: location 0, 3 floats, stride 5 floats
+		    glVertexAttribPointer(0, 3, GL_FLOAT, false, 5 * Float.BYTES, 0);
+		    glEnableVertexAttribArray(0);
+		    
+		    // uv attribute: location 1, 2 floats, stride 5 floats, offset 3
+		    glVertexAttribPointer(1, 2, GL_FLOAT, false,
+		        5 * Float.BYTES, 3 * Float.BYTES);
+		    glEnableVertexAttribArray(1);
+
+		    glBindVertexArray(0);
+		    
+		    // Background shader
+		    String vertSrc =
+		        "#version 330 core\n" +
+		        "layout(location = 0) in vec3 aPos;\n" +
+		        "layout(location = 1) in vec2 aUV;\n" +
+		        "out vec2 vUV;\n" +
+		        "void main() {\n" +
+		        "    gl_Position = vec4(aPos, 1.0);\n" +
+		        "    vUV = aUV;\n" +
+		        "}\n";
+
+		    String fragSrc =
+		        "#version 330 core\n" +
+		        "in vec2 vUV;\n" +
+		        "uniform sampler2D uTexture;\n" +
+		        "out vec4 FragColor;\n" +
+		        "void main() {\n" +
+		        "    FragColor = texture(uTexture, vUV);\n" +
+		        "}\n";
+		    
+		    int vert = glCreateShader(GL_VERTEX_SHADER);
+		    glShaderSource(vert, vertSrc);
+		    glCompileShader(vert);
+		    checkShader(vert, "background vertex");
+		    
+		    int frag = glCreateShader(GL_FRAGMENT_SHADER);
+		    glShaderSource(frag, fragSrc);
+		    glCompileShader(frag);
+		    checkShader(frag, "background fragment");
+		    
+		    backgroundShader = glCreateProgram();
+		    glAttachShader(backgroundShader, vert);
+		    glAttachShader(backgroundShader, frag);
+		    glLinkProgram(backgroundShader);
+		    
+		    glDeleteShader(vert);
+		    glDeleteShader(frag);
+		}
 
 	    private void checkShader(int shader, String name) {
 	        if (glGetShaderi(shader, GL_COMPILE_STATUS) == GL_FALSE) {
@@ -329,7 +427,7 @@ public class SimulationRenderer {
 	        });
 
 	        glfwSetMouseButtonCallback(windowHandle, (win, button, action, mods) -> {
-	            if (button == GLFW_MOUSE_BUTTON_LEFT ) {
+	            if (button == GLFW_MOUSE_BUTTON_RIGHT) {
 	            	//Only pan in the simluation area, not the UI
 	            	if (action == GLFW_PRESS && !ImGui.isWindowHovered(imgui.flag.ImGuiHoveredFlags.AnyWindow)) {
 	            		mouseDown = true;
@@ -497,6 +595,35 @@ public class SimulationRenderer {
 	        
 	        ImGui.end();
 	    }
+	    
+	    //Background Texture
+	    private int loadTexture(String path) {
+	    	int[] width = new int[1];
+	    	int[] height =new int[1];
+	    	int[] channels = new int[1];
+	    	
+	    	org.lwjgl.stb.STBImage.stbi_set_flip_vertically_on_load(true);
+	    	java.nio.ByteBuffer image = org.lwjgl.stb.STBImage.stbi_load(
+	    			path, width, height, channels, 4);
+	    	
+	    	if (image == null) {
+	    		throw new RuntimeException("Failed to load texture: " + path + " -- " + org.lwjgl.stb.STBImage.stbi_failure_reason());
+	    	}
+	    	
+	    	int textureId = glGenTextures();
+	    	glBindTexture(GL_TEXTURE_2D, textureId);
+	    	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	    	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width[0], height[0], 0, GL_RGBA, GL_UNSIGNED_BYTE, image);
+	        
+	        org.lwjgl.stb.STBImage.stbi_image_free(image);
+	        return textureId;
+	    }
+	    
+	    
+	    
 }
 
 

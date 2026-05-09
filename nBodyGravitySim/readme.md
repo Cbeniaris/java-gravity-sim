@@ -23,6 +23,8 @@ A real-time gravitational simulation of the solar system built in Java using Ope
 - Tweaking time scale during run time. (Completed)
 - Texturing of bodies dynamically
 - GUI (Completed)
+- Labeling of bodies while zoomed out for tracking
+- Saving/Loading different initial simulation states (in progress)
 
 ---
 
@@ -159,7 +161,7 @@ Or from Eclipse: right-click `Main.java` → Run As → Java Application. Ensure
 | Input | Action |    
 |---|---|  
 | Scroll wheel | Zoom in / out |  
-| Left-click drag | Pan camera |  
+| Right-click drag | Pan camera |  
 | `V` | Toggle velocity vectors |  
 | `A` | Toggle acceleration vectors |  
 | `Q` | Toggle quadtree grid overlay |  
