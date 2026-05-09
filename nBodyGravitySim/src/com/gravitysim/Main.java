@@ -51,7 +51,7 @@ public class Main {
 		    // Circular orbit velocity — perpendicular to radius
 		    double speed = Math.sqrt(G * M / r);
 		    double vx = -speed * Math.sin(angle);
-		    double vy =  speed * Math.cos(angle);
+		    double vy = speed * Math.cos(angle);
 
 		    totalMomentumX += mass * vx;
 		    totalMomentumY += mass * vy;
@@ -68,14 +68,14 @@ public class Main {
 		int asteroidCount = 2000;
 		for (int i = 0; i < asteroidCount; i++) {
 		    // Random radius between 2.2 and 3.2 AU
-		    double r     = (2.2 + rand.nextDouble() * 1.0) * 1.496e11;
+		    double r = (2.2 + rand.nextDouble() * 1.0) * 1.496e11;
 
 		    // Random angle spread around the belt
 		    double angle = rand.nextDouble() * 2 * Math.PI;
 
 		    // Small eccentricity — slightly elliptical orbits
 		    // achieved by perturbing the velocity by +-5%
-		    double speed       = Math.sqrt(G * M / r);
+		    double speed = Math.sqrt(G * M / r);
 		    double perturbation = 1.0 + (rand.nextDouble() - 0.5) * 0.05;
 		    speed *= perturbation;
 

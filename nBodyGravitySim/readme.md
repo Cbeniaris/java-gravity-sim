@@ -18,9 +18,9 @@ A real-time gravitational simulation of the solar system built in Java using Ope
 ## Planned Features
 
 - Creating bodies while the simulation is running.
-- Tweaking time scale during run time.
+- Tweaking time scale during run time. (Completed)
 - Texturing of bodies dynamically
-- GUI
+- GUI (Completed)
 
 ---
 

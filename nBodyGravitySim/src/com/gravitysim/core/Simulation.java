@@ -14,6 +14,10 @@ public class Simulation {
 	public double epsilon;
 	public double dt;
 	
+	private boolean paused = false;
+	private List<Body> initialBodies; // snapshot for reset
+
+	
 	public Simulation(double G, double epsilon, double dt) {
 		this.G = G;
 		this.epsilon = epsilon;
@@ -29,13 +33,26 @@ public class Simulation {
 	}
 	
 	public void initialize() {
-		tree.build(bodies);
-		computeAccelerations();
+		// Store a deep copy of initial state for reset
+		initialBodies = new ArrayList<>();
+	    for (Body b : bodies) {
+	    	initialBodies.add( new Body(
+	            new Vector2D(b.position.x, b.position.y),
+	            new Vector2D(b.velocity.x, b.velocity.y),
+	            b.mass, 
+	            b.radius
+	        ));
+	    }
+	    tree.build(bodies);
+	    computeAccelerations();
 	}
 	
 	//simulation loop
 	
 	public void step() {
+		//check if pause
+		if (paused) { return; }
+		
 		//step 1 : halfkick
 		for (Body b : bodies) {
 			b.halfKick(dt);
@@ -66,10 +83,27 @@ public class Simulation {
 		}
 	}
 	
+	public void reset() {
+		bodies.clear();
+		for (Body b : initialBodies) {
+			bodies.add(new Body(
+				new Vector2D(b.position.x, b.position.y),
+	            new Vector2D(b.velocity.x, b.velocity.y),
+				b.mass,
+				b.radius
+			)); 
+		}
+		paused = false;
+		tree.build(bodies);
+		computeAccelerations();
+	}
+	
 	// Setters / getters
 	
 	public List<Body> getBodies() { return bodies; }
 	public QuadTree getTree() { return tree; }
 	public int getBodyCount() { return bodies.size(); }
 	public void setTheta(double theta) { tree.setTheta(theta); }
+	public boolean isPaused() { return paused; }
+	public void togglePause() { paused = !paused; }
 }

@@ -10,9 +10,18 @@ import org.lwjgl.system.MemoryUtil;
 import java.nio.FloatBuffer;
 import java.util.List;
 
+import imgui.ImGui;
+import imgui.gl3.ImGuiImplGl3;
+import imgui.glfw.ImGuiImplGlfw;
+import imgui.type.ImBoolean;
+import imgui.type.ImFloat;
+import imgui.type.ImInt;
+
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL33.*;
 import static org.lwjgl.system.MemoryUtil.NULL;
+
+
 
 public class SimulationRenderer {
 
@@ -42,6 +51,12 @@ public class SimulationRenderer {
 	private static final float ACCELERATION_SCALE = 1e12f;
 	private static final float WORLD_SCALE = 1e-11f;
 	
+	//ImGui
+	private ImGuiImplGlfw imguiGlfw;
+	private ImGuiImplGl3 imguiGl3;
+	private boolean showUI = false;
+	
+	
 	//init
 	
 	public void init() {
@@ -69,6 +84,12 @@ public class SimulationRenderer {
 		setupShaders();
 		setupBuffers();
 		
+		ImGui.createContext();
+		imguiGlfw = new ImGuiImplGlfw();
+		imguiGl3 = new ImGuiImplGl3();
+		imguiGlfw.init(windowHandle, true);
+		imguiGl3.init("#version 330 core");
+		
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	}
@@ -87,9 +108,16 @@ public class SimulationRenderer {
 		
 		renderBodies(sim.getBodies());
 		
-		if (showVelocityVectors) { renderVelocityVectors(sim.getBodies());}
-		if (showAccelerationVectors) renderAccelerationVectors(sim.getBodies());
-        if (showQuadTree)            renderQuadTree(sim.getTree().getRoot());
+		if (showVelocityVectors) { renderVelocityVectors(sim.getBodies()); }
+		if (showAccelerationVectors) { renderAccelerationVectors(sim.getBodies()); }
+        if (showQuadTree) { renderQuadTree(sim.getTree().getRoot()); }
+        
+        //imgui frame
+        imguiGlfw.newFrame();
+        ImGui.newFrame();
+        renderUI(sim);
+        ImGui.render();
+        imguiGl3.renderDrawData(ImGui.getDrawData());
         
         glfwSwapBuffers(windowHandle);
         glfwPollEvents();
@@ -106,14 +134,14 @@ public class SimulationRenderer {
 	    int offset = 0;
 
 	    for (Body b : bodies) {
-	        float cx     = (float)(b.position.x * WORLD_SCALE);
-	        float cy     = (float)(b.position.y * WORLD_SCALE);
+	        float cx = (float)(b.position.x * WORLD_SCALE);
+	        float cy = (float)(b.position.y * WORLD_SCALE);
 	        float radius = (float)(b.radius * WORLD_SCALE);
 
 	        // How many world units correspond to 1 pixel at current zoom
 	        float viewSize = 20.0f / camera.zoom;
 	        float worldUnitsPerPixel = (viewSize * 2) / windowWidth;
-	        float minRadius = 1f * worldUnitsPerPixel; // minimum 1.5 pixels on scree
+	        float minRadius = 1.5f * worldUnitsPerPixel; // minimum 1.5 pixels on scree
 	        
 	        radius = Math.max(radius, minRadius);
 	        
@@ -155,12 +183,12 @@ public class SimulationRenderer {
 	private void renderVelocityVectors(List<Body> bodies) {
 		float[] verts = new float[bodies.size() * 6];
 		for (int i = 0; i < bodies.size(); i++) {
-            Body b   = bodies.get(i);
+            Body b = bodies.get(i);
             float x0 = (float)(b.position.x * WORLD_SCALE);
             float y0 = (float)(b.position.y * WORLD_SCALE);
             float x1 = (float)((b.position.x + b.velocity.x * VELOCITY_SCALE) * WORLD_SCALE);
             float y1 = (float)((b.position.y + b.velocity.y * VELOCITY_SCALE) * WORLD_SCALE);
-            verts[i * 6]     = x0; verts[i * 6 + 1] = y0; verts[i * 6 + 2] = 0;
+            verts[i * 6] = x0; verts[i * 6 + 1] = y0; verts[i * 6 + 2] = 0;
             verts[i * 6 + 3] = x1; verts[i * 6 + 4] = y1; verts[i * 6 + 5] = 0;
         }
         uploadAndDraw(verts, GL_LINES, 0.2f, 0.6f, 1.0f, 0.8f); // blue
@@ -185,10 +213,10 @@ public class SimulationRenderer {
 	 private void renderQuadTree(QuadTreeNode node) {
 	        if (node == null || node.isEmpty()) return;
 	        BoundingBox b  = node.boundary;
-	        float x0       = (float)((b.x - b.halfWidth) * WORLD_SCALE);
-	        float x1       = (float)((b.x + b.halfWidth) * WORLD_SCALE);
-	        float y0       = (float)((b.y - b.halfWidth) * WORLD_SCALE);
-	        float y1       = (float)((b.y + b.halfWidth) * WORLD_SCALE);
+	        float x0 = (float)((b.x - b.halfWidth) * WORLD_SCALE);
+	        float x1 = (float)((b.x + b.halfWidth) * WORLD_SCALE);
+	        float y0 = (float)((b.y - b.halfWidth) * WORLD_SCALE);
+	        float y1 = (float)((b.y + b.halfWidth) * WORLD_SCALE);
 	        float[] verts  = {
 	            x0, y0, 0,  x1, y0, 0,
 	            x1, y0, 0,  x1, y1, 0,
@@ -301,17 +329,22 @@ public class SimulationRenderer {
 	        });
 
 	        glfwSetMouseButtonCallback(windowHandle, (win, button, action, mods) -> {
-	            if (button == GLFW_MOUSE_BUTTON_LEFT) {
-	                mouseDown = action == GLFW_PRESS;
-	                double[] mx = new double[1], my = new double[1];
-	                glfwGetCursorPos(win, mx, my);
-	                lastMouseX = mx[0];
-	                lastMouseY = my[0];
+	            if (button == GLFW_MOUSE_BUTTON_LEFT ) {
+	            	//Only pan in the simluation area, not the UI
+	            	if (action == GLFW_PRESS && !ImGui.isWindowHovered(imgui.flag.ImGuiHoveredFlags.AnyWindow)) {
+	            		mouseDown = true;
+	            	} else if (action == GLFW_RELEASE) {
+	            		mouseDown = false;
+	            	}
+		                double[] mx = new double[1], my = new double[1];
+		                glfwGetCursorPos(win, mx, my);
+		                lastMouseX = mx[0];
+		                lastMouseY = my[0];
 	            }
 	        });
 
 	        glfwSetCursorPosCallback(windowHandle, (win, mx, my) -> {
-	            if (mouseDown) {
+	            if (mouseDown && !ImGui.isWindowHovered(imgui.flag.ImGuiHoveredFlags.AnyWindow)) {
 	            	 float dx = (float)(mx - lastMouseX);
 	                 float dy = (float)(my - lastMouseY);
 
@@ -351,11 +384,116 @@ public class SimulationRenderer {
 	    }
 
 	    public void cleanup() {
+	    	imguiGl3.dispose();
+	    	imguiGlfw.dispose();
+	    	ImGui.destroyContext();
+	    	
 	        glDeleteVertexArrays(vao);
 	        glDeleteBuffers(vbo);
 	        glDeleteProgram(shaderProgram);
 	        glfwDestroyWindow(windowHandle);
 	        glfwTerminate();
+	    }
+	    
+	    //Render UI
+	    
+	    private void renderUI(Simulation sim) {
+	    	//check if the UI is hidden or being shown
+	    	if (!showUI) {
+	            // Show only the small toggle button when hidden
+	            ImGui.setNextWindowPos(10, 10, imgui.flag.ImGuiCond.Always);
+	            ImGui.setNextWindowSize(90, 30, imgui.flag.ImGuiCond.Always);
+	            ImGui.begin("##toggle_collapsed",
+	                new ImBoolean(true),
+	                imgui.flag.ImGuiWindowFlags.NoTitleBar |
+	                imgui.flag.ImGuiWindowFlags.NoResize |
+	                imgui.flag.ImGuiWindowFlags.NoScrollbar |
+	                imgui.flag.ImGuiWindowFlags.NoCollapse |
+	                imgui.flag.ImGuiWindowFlags.NoMove
+	            );
+	            if (ImGui.button("Controls", 74, 18)) {
+	                showUI = true;
+	            }
+	            ImGui.end();
+	            return;
+	        }
+	    
+	    	
+	    	//pin the window to the top left corner
+	    	ImGui.setNextWindowPos(10, 10, imgui.flag.ImGuiCond.Always);
+	    	ImGui.setNextWindowSize(400, 320, imgui.flag.ImGuiCond.Always);
+	    	ImGui.begin("Simulation Controls",
+	    		imgui.flag.ImGuiWindowFlags.NoCollapse |
+	    		imgui.flag.ImGuiWindowFlags.NoResize |
+	    		imgui.flag.ImGuiWindowFlags.NoMove
+	    		);
+	    	
+	    	
+	    	//simulation text
+	    	ImGui.text("Simulation");
+	    	
+	    	//time slider
+	    	float[] dt = { (float) sim.dt };
+	    	if (ImGui.sliderFloat("Timestep (s)", dt, 3600f, 604800)) {
+	    		sim.dt = dt[0];
+	    	}
+	    	ImGui.sameLine();
+	    	ImGui.textDisabled("(?)");
+	    	if (ImGui.isItemHovered()) {
+	    		ImGui.setTooltip("Seconds simulated per step. \n 3600 = 1 hour, 86400 = 1 day");
+	    	}
+	    	
+	    	//Theta slider
+	    	float[] theta = { (float) sim.getTree().getTheta()};
+	    	if (ImGui.sliderFloat("Theta", theta, 0.1f, 2.0f)) {
+	    		sim.setTheta(theta[0]);
+	    	}
+	    	ImGui.sameLine();
+	    	ImGui.textDisabled("(?)");
+	    	if (ImGui.isItemHovered()) {
+	    		ImGui.setTooltip("Barnes-Hut accuracy threshold. \n Lower = more accurate, more computing \n Higher = less accurate, faster");
+	    	}
+	    	
+	    	//Pause, reset, and hide Button
+	    	ImGui.spacing();
+	        if (ImGui.button(sim.isPaused() ? "Resume" : "Pause", 120, 24)) {
+	            sim.togglePause();
+	        }
+	        ImGui.sameLine();
+	        if (ImGui.button("Reset", 120, 24)) {
+	            sim.reset();
+	        }
+	        ImGui.sameLine();
+	        if (ImGui.button("Hide UI", 120, 24)) {
+                showUI = false;
+            }
+	        
+	        
+	    	//Debug Overlays
+	        ImGui.spacing();
+	        ImGui.text("Debug Overlays");
+	        
+	        ImBoolean velVec = new ImBoolean(showVelocityVectors);
+	        ImBoolean accVec = new ImBoolean(showAccelerationVectors);
+	        ImBoolean qtree = new ImBoolean(showQuadTree);
+	        
+	        if (ImGui.checkbox("Velocity Vectors  [V]", velVec))
+	            showVelocityVectors = velVec.get();
+	        if (ImGui.checkbox("Acceleration Vectors  [A]", accVec))
+	            showAccelerationVectors = accVec.get();
+	        if (ImGui.checkbox("Quadtree Grid  [Q]", qtree))
+	            showQuadTree = qtree.get();
+	       
+	        //Stats
+	       
+	        ImGui.spacing();
+	        ImGui.text("Stats");
+	        ImGui.text("Bodies : " + sim.getBodyCount());
+	        ImGui.text(String.format("dt: %.0f s (%.2f days)", sim.dt, sim.dt / 86400.0));
+	        ImGui.text(String.format("Theta: %.2f", sim.getTree().getTheta()));
+	        ImGui.text(String.format("Zoom: %.4f", camera.zoom));
+	        
+	        ImGui.end();
 	    }
 }
 
