@@ -2,7 +2,7 @@
 
 A real-time gravitational simulation of the solar system built in Java using OpenGL for rendering. Simulates gravitational interactions between hundreds of bodies including planets and an asteroid belt, optimized using the Barnes-Hut algorithm for near-linear performance scaling. 
 
-![Simulation while running on a machine] (gravity_sim.png)
+![Simulation while running on a machine](gravity_sim.png)
 
 ---
 
