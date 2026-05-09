@@ -2,6 +2,7 @@ package com.gravitysim;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 import com.gravitysim.core.Body;
 import com.gravitysim.core.Simulation;
@@ -17,18 +18,19 @@ public class Main {
 		
 		double G = 6.674e-11;
 		double M = 1.989e30; // star mass
+		Random rand = new Random(42); // fixed seed for reproducibility
 
 		// Planet orbital parameters — {radius in AU, mass in kg, start angle in degrees, Body Radius}
 		double[][] planets = {
 		    { 0.4 * 1.496e11, 3.3e23,   0,   2.5e9 },  // Mercury
-		    { 0.7 * 1.496e11, 4.87e24,  90,  6.0e9 },  // Venus
-		    { 1.0 * 1.496e11, 5.97e24,  180, 6.4e9 },  // Earth
-		    { 1.5 * 1.496e11, 6.39e23,  270, 3.4e9 },  // Mars
-		    { 5.2 * 1.496e11, 1.898e27, 45,  7.0e9 },  // Jupiter
-		    { 9.58 * 1.496e11, 5.86e26, 120,  5.8232e9 },  // Saturn
-		    { 19.2 * 1.496e11, 8.68e25, 120,  2.5559e9 },  // Neptune
-		    { 30.1 * 1.496e11, 1.024e26, 300,  2.4764e9 },  // Neptune
-		    { 40 * 1.496e11, 1.31e22, 230,  1.15e8 },  // Pluto
+		    { 0.7 * 1.496e11, 4.87e24,  30,  6.0e9 },  // Venus
+		    { 1.0 * 1.496e11, 5.97e24,  60, 6.4e9 },  // Earth
+		    { 1.5 * 1.496e11, 6.39e23,  90, 3.4e9 },  // Mars
+		    { 5.2 * 1.496e11, 1.898e27, 120,  7.0e9 },  // Jupiter
+		    { 9.58 * 1.496e11, 5.68e26, 150,  5.8232e9 },  // Saturn
+		    { 19.2 * 1.496e11, 8.68e25, 180,  2.5559e9 },  // Uranus
+		    { 30.1 * 1.496e11, 1.02e26, 210,  2.4764e9 },  // Neptune
+		    { 40 * 1.496e11, 1.31e22, 240,  1.15e8 },  // Pluto
 		};
 
 		// Calculate total momentum of all planets first
@@ -58,6 +60,40 @@ public class Main {
 		        new Vector2D(px, py),
 		        new Vector2D(vx, vy),
 		        mass, radius
+		    ));
+		}
+		
+		// Asteroid belt — between Mars (1.5 AU) and Jupiter (5.2 AU)
+		// Real belt is roughly 2.2 to 3.2 AU
+		int asteroidCount = 2000;
+		for (int i = 0; i < asteroidCount; i++) {
+		    // Random radius between 2.2 and 3.2 AU
+		    double r     = (2.2 + rand.nextDouble() * 1.0) * 1.496e11;
+
+		    // Random angle spread around the belt
+		    double angle = rand.nextDouble() * 2 * Math.PI;
+
+		    // Small eccentricity — slightly elliptical orbits
+		    // achieved by perturbing the velocity by +-5%
+		    double speed       = Math.sqrt(G * M / r);
+		    double perturbation = 1.0 + (rand.nextDouble() - 0.5) * 0.05;
+		    speed *= perturbation;
+
+		    double px = r * Math.cos(angle);
+		    double py = r * Math.sin(angle);
+		    double vx = -speed * Math.sin(angle);
+		    double vy =  speed * Math.cos(angle);
+
+		    // Asteroid mass — tiny, negligible gravitational effect
+		    double mass = 1e12 + rand.nextDouble() * 1e15;
+
+		    totalMomentumX += mass * vx;
+		    totalMomentumY += mass * vy;
+
+		    planetBodies.add(new Body(
+		        new Vector2D(px, py),
+		        new Vector2D(vx, vy),
+		        mass, 5e8  // small but visible
 		    ));
 		}
 
