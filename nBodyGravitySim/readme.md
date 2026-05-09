@@ -24,7 +24,7 @@ A real-time gravitational simulation of the solar system built in Java using Ope
 - Texturing of bodies dynamically
 - GUI (Completed)
 - Labeling of bodies while zoomed out for tracking
-- Saving/Loading different initial simulation states (in progress)
+- Saving/Loading different simulationa states (Completed, File explorere to be added)
 
 ---
 
@@ -166,6 +166,16 @@ Or from Eclipse: right-click `Main.java` → Run As → Java Application. Ensure
 | `A` | Toggle acceleration vectors |  
 | `Q` | Toggle quadtree grid overlay |  
 | `Escape` | Exit |  
+
+---
+
+## Saving / Loading
+
+Simulation states can be saved or loaded by the UI.  Files are saved in JSON format to
+
+```
+./saves/*NAME_OF_SIMULATION*.json
+```
 
 ---
 
