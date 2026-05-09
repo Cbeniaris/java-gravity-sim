@@ -421,13 +421,18 @@ public class SimulationRenderer {
 	    	
 	    	//pin the window to the top left corner
 	    	ImGui.setNextWindowPos(10, 10, imgui.flag.ImGuiCond.Always);
-	    	ImGui.setNextWindowSize(400, 320, imgui.flag.ImGuiCond.Always);
+	    	ImGui.setNextWindowSize(410, 330, imgui.flag.ImGuiCond.Always);
 	    	ImGui.begin("Simulation Controls",
 	    		imgui.flag.ImGuiWindowFlags.NoCollapse |
 	    		imgui.flag.ImGuiWindowFlags.NoResize |
 	    		imgui.flag.ImGuiWindowFlags.NoMove
 	    		);
 	    	
+	    	//Hide UI button
+	    	ImGui.sameLine();
+	    		if (ImGui.button("Hide UI", 74, 18)) {
+	            showUI = false;
+            }
 	    	
 	    	//simulation text
 	    	ImGui.text("Simulation");
@@ -463,10 +468,7 @@ public class SimulationRenderer {
 	        if (ImGui.button("Reset", 120, 24)) {
 	            sim.reset();
 	        }
-	        ImGui.sameLine();
-	        if (ImGui.button("Hide UI", 120, 24)) {
-                showUI = false;
-            }
+	       
 	        
 	        
 	    	//Debug Overlays
