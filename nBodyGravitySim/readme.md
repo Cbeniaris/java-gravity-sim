@@ -23,8 +23,8 @@ A real-time gravitational simulation of the solar system built in Java using Ope
 - Tweaking time scale during run time. (Completed)
 - Texturing of bodies dynamically
 - GUI (Completed)
-- Labeling of bodies while zoomed out for tracking
-- Saving/Loading different simulationa states (Completed, File explorere to be added)
+- Labeling of bodies while zoomed out for tracking (Completed)
+- Saving/Loading different simulationa states (Completed, File explorer to be added)
 
 ---
 

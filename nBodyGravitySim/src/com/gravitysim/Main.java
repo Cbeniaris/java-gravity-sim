@@ -22,44 +22,50 @@ public class Main {
 
 		// Planet orbital parameters — {radius in AU, mass in kg, start angle in degrees, Body Radius}
 		double[][] planets = {
-		    { 0.4 * 1.496e11, 3.3e23,   0,   2.5e9 },  // Mercury
-		    { 0.7 * 1.496e11, 4.87e24,  30,  6.0e9 },  // Venus
-		    { 1.0 * 1.496e11, 5.97e24,  60, 6.4e9 },  // Earth
-		    { 1.5 * 1.496e11, 6.39e23,  90, 3.4e9 },  // Mars
-		    { 5.2 * 1.496e11, 1.898e27, 120,  7.0e9 },  // Jupiter
-		    { 9.58 * 1.496e11, 5.68e26, 150,  5.8232e9 },  // Saturn
-		    { 19.2 * 1.496e11, 8.68e25, 180,  2.5559e9 },  // Uranus
-		    { 30.1 * 1.496e11, 1.02e26, 210,  2.4764e9 },  // Neptune
-		    { 40 * 1.496e11, 1.31e22, 240,  1.15e8 },  // Pluto
+		    { 0.4 * 1.496e11, 3.3e23, 0, 2.5e9, 1},  // Mercury
+		    { 0.7 * 1.496e11, 4.87e24, 30, 6.0e9, 1},  // Venus
+		    { 1.0 * 1.496e11, 5.97e24, 60, 6.4e9, 1},  // Earth
+		    { 1.5 * 1.496e11, 6.39e23, 90, 3.4e9, 1},  // Mars
+		    { 5.2 * 1.496e11, 1.898e27, 120, 7.0e9, 1},  // Jupiter
+		    { 9.58 * 1.496e11, 5.68e26, 150, 5.8232e9, 1},  // Saturn
+		    { 19.2 * 1.496e11, 8.68e25, 180, 2.5559e9, 1},  // Uranus
+		    { 30.1 * 1.496e11, 1.02e26, 210, 2.4764e9, 1},  // Neptune
+		    { 40 * 1.496e11, 1.31e22, 240, 1.15e8, 1},  // Pluto
+		};
+		
+		// names of planets
+
+		String[] names = {
+		    "Mercury", "Venus", "Earth", "Mars",
+		    "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"
 		};
 
 		// Calculate total momentum of all planets first
 		double totalMomentumX = 0;
 		double totalMomentumY = 0;
 
-		List<Body> planetBodies = new ArrayList<>();
-		for (double[] p : planets) {
-		    double r = p[0];
-		    double mass = p[1];
-		    double angle = Math.toRadians(p[2]);
-		    double radius = p[3];
+		List<Body> allBodies = new ArrayList<>();
+		for (int i = 0; i < planets.length; i++) {
+		    double[] p     = planets[i];
+		    double r       = p[0];
+		    double mass    = p[1];
+		    double angle   = Math.toRadians(p[2]);
+		    double radius  = p[3];
+		    boolean track  = p[4] == 1;
 
-		    // Position around the star
-		    double px = r * Math.cos(angle);
-		    double py = r * Math.sin(angle);
-
-		    // Circular orbit velocity — perpendicular to radius
+		    double px    = r * Math.cos(angle);
+		    double py    = r * Math.sin(angle);
 		    double speed = Math.sqrt(G * M / r);
-		    double vx = -speed * Math.sin(angle);
-		    double vy = speed * Math.cos(angle);
+		    double vx    = -speed * Math.sin(angle);
+		    double vy    =  speed * Math.cos(angle);
 
 		    totalMomentumX += mass * vx;
 		    totalMomentumY += mass * vy;
 
-		    planetBodies.add(new Body(
+		    allBodies.add(new Body(
 		        new Vector2D(px, py),
 		        new Vector2D(vx, vy),
-		        mass, radius
+		        mass, radius, names[i], track
 		    ));
 		}
 		
@@ -90,7 +96,7 @@ public class Main {
 		    totalMomentumX += mass * vx;
 		    totalMomentumY += mass * vy;
 
-		    planetBodies.add(new Body(
+		    allBodies.add(new Body(
 		        new Vector2D(px, py),
 		        new Vector2D(vx, vy),
 		        mass, 5e8  // small but visible
@@ -104,11 +110,11 @@ public class Main {
 		Body star = new Body(
 		    new Vector2D(0, 0),
 		    new Vector2D(starVx, starVy),
-		    M, 5.0e10
+		    M, 5.0e10, "Sol", true
 		);
 
 		sim.addBody(star);
-		for (Body b : planetBodies) {
+		for (Body b : allBodies) {
 		    sim.addBody(b);
 		}
 

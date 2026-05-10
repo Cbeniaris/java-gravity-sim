@@ -6,6 +6,18 @@ public class Body {
 	public Vector2D acceleration;
 	public double mass;
 	public double radius;
+	public String name;
+	public boolean trackable = false;
+	
+	public Body(Vector2D position, Vector2D velocity, double mass, double radius, String name, boolean trackable) {
+		this.position = position;
+		this.velocity = velocity;
+		this.acceleration = Vector2D.zero();
+		this.mass = mass;
+		this.radius = radius;
+		this.name = name;
+		this.trackable = trackable;
+	}
 	
 	public Body(Vector2D position, Vector2D velocity, double mass, double radius) {
 		this.position = position;
@@ -32,5 +44,9 @@ public class Body {
 	
 	public void halfKick(double dt) {
 		velocity = velocity.add(acceleration.scale(0.5 * dt));
+	}
+	
+	public String getDisplayName() {
+		return (name != null && !name.isEmpty()) ? name : "Unnamed Body";
 	}
 }

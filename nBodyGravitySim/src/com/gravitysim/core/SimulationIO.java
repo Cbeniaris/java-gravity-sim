@@ -22,6 +22,8 @@ public class SimulationIO {
 		double velX, velY;
 		double mass;
 		double radius;
+		String name;
+		boolean trackable;
 		
 		BodyDTO(Body b) {
 			posX = b.position.x;
@@ -30,13 +32,15 @@ public class SimulationIO {
 			velY = b.velocity.y;
 			mass = b.mass;
 			radius = b.radius;
+			name = b.name;
+			trackable = b.trackable;
 		}
 		
 		Body toBody() {
 			return new Body(
 				new Vector2D(posX, posY),
 				new Vector2D(velX, velY),
-				mass, radius); 
+				mass, radius, name, trackable); 
 		}
 	}
 	

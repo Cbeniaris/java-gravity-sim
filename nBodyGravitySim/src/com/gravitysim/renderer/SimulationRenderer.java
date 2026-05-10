@@ -67,9 +67,10 @@ public class SimulationRenderer {
 	private imgui.type.ImString saveFilePath = new imgui.type.ImString("simulation", 128);
 	private String saveStatusMessage = "";
 	
+	//Tracking Indicators
+	private static final float TRACKING_THRESHOLD_PX = 5.0f;
 	
 	//init
-	
 	public void init() {
 		// Force X11 backend instead of Wayland
 		org.lwjgl.glfw.GLFW.glfwInitHint(
@@ -110,7 +111,6 @@ public class SimulationRenderer {
 	}
 	
 	//main render call
-	
 	public void render(Simulation sim) {
 		glClearColor(0.05f, 0.05f, 0.08f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
@@ -125,25 +125,26 @@ public class SimulationRenderer {
 		glUseProgram(shaderProgram);
 		setUniformMatrix(mvp);
 		
+		imguiGlfw.newFrame();
+		ImGui.newFrame();
+
 		renderBodies(sim.getBodies());
-		
+
 		if (showVelocityVectors) { renderVelocityVectors(sim.getBodies()); }
 		if (showAccelerationVectors) { renderAccelerationVectors(sim.getBodies()); }
-        if (showQuadTree) { renderQuadTree(sim.getTree().getRoot()); }
+		if (showQuadTree) { renderQuadTree(sim.getTree().getRoot()); }
+
+		renderUI(sim);
         
-        //imgui frame
-        imguiGlfw.newFrame();
-        ImGui.newFrame();
-        renderUI(sim);
-        ImGui.render();
-        imguiGl3.renderDrawData(ImGui.getDrawData());
+		renderTrackingIndicators(sim.getBodies());
         
+		ImGui.render();
+		imguiGl3.renderDrawData(ImGui.getDrawData());
         glfwSwapBuffers(windowHandle);
         glfwPollEvents();
 	}
 	
 	//body rendering
-	
 	private void renderBodies(List<Body> bodies) {
 		int segments = 48; // 48 triangles per circle 
 
@@ -198,7 +199,6 @@ public class SimulationRenderer {
 	}
 	
 	//Background Rendering
-	
 	private void renderBackground() {
 		glUseProgram(backgroundShader);
 		glBindVertexArray(backgroundVao);
@@ -210,8 +210,241 @@ public class SimulationRenderer {
 	}
 	
 	
-	//vector rendering
+	//Render Tracking Lines
+	private void renderTrackingIndicators(List<Body> bodies) {
+	    // Leader line lengths in screen pixels — converted to world space
+	    float viewSize       = 20.0f / camera.zoom;
+	    float worldPerPixel  = (viewSize * 2.0f) / windowWidth;
+
+	    float diagonalLen = 20.0f * worldPerPixel;  // length of the NW diagonal
+	    float horizontalLen = 30.0f * worldPerPixel; // length of the horizontal segment
+
+	    for (Body b : bodies) {
+	        if (!b.trackable) continue;
+
+	        // Calculate screen-space radius to check threshold
+	        float worldRadius  = (float)(b.radius * WORLD_SCALE);
+	        float screenRadius = worldRadius / worldPerPixel;
+
+	        if (screenRadius > TRACKING_THRESHOLD_PX) continue;
+
+	        // Body position in OpenGL space
+	        float bx = (float)(b.position.x * WORLD_SCALE);
+	        float by = (float)(b.position.y * WORLD_SCALE);
+
+	        // Diagonal goes NW
+	        float diagEndX = bx - diagonalLen;
+	        float diagEndY = by + diagonalLen;
+
+	        // Horizontal extends left from diagonal end
+	        float horizEndX = diagEndX - horizontalLen;
+	        float horizEndY = diagEndY;
+
+	        // Draw the two line segments
+	        float[] lineVerts = {
+	            bx,       by,       0,   // start at body
+	            diagEndX, diagEndY, 0,   // end of diagonal
+	            diagEndX, diagEndY, 0,   // start of horizontal
+	            horizEndX, horizEndY, 0  // end of horizontal
+	        };
+	        uploadAndDraw(lineVerts, GL_LINES, 0.9f, 0.9f, 0.9f, 0.7f);
+
+	        // Render label above the horizontal line
+	        renderLabel(b.getDisplayName(), horizEndX, horizEndY, worldPerPixel);
+	    }
+	}
 	
+	private float[] worldToScreen(float worldX, float worldY) {
+		//build the same mvp the gpu uses
+		Matrix4f view = camera.getViewMatrix();
+		Matrix4f proj = camera.getProjectionMatrix(windowWidth, windowHeight);
+		Matrix4f mvp = proj.mul(view, new Matrix4f());
+		
+		//Transform the point through mvp
+		org.joml.Vector4f clip = mvp.transform(new org.joml.Vector4f(worldX, worldY, 0.0f, 1.0f));
+		
+		//prespective divide to get ndc
+		float ndcX = clip.x / clip.w;
+		float ndcY = clip.y / clip.w;
+		
+		//ndc to screen pixels
+		float screenX = (ndcX + 1.0f) * 0.5f * windowWidth;
+		float screenY = (1.0f - (ndcY + 1.0f) * 0.5f) * windowHeight;
+		
+		return new float[] { screenX, screenY };
+	}
+	
+	private float[] screenToWorld(float screenX, float screenY) {
+	    // Screen pixels to NDC
+	    float ndcX =  (screenX / windowWidth)  * 2.0f - 1.0f;
+	    float ndcY = -((screenY / windowHeight) * 2.0f - 1.0f);
+
+	    // Build inverse MVP
+	    Matrix4f view = camera.getViewMatrix();
+	    Matrix4f proj = camera.getProjectionMatrix(windowWidth, windowHeight);
+	    Matrix4f mvp  = proj.mul(view, new Matrix4f());
+	    Matrix4f invMvp = mvp.invert(new Matrix4f());
+
+	    // Transform NDC back to world space
+	    org.joml.Vector4f world = invMvp.transform(
+	        new org.joml.Vector4f(ndcX, ndcY, 0.0f, 1.0f));
+
+	    return new float[]{ world.x, world.y };
+	}
+	
+	private void renderLabel(String text, float worldX, float worldY, float worldPerPixel) {
+		float[] screen = worldToScreen(worldX, worldY);
+
+	    // Offset above the horizontal line end
+	    float screenX = screen[0];
+	    float screenY = screen[1] - 14.0f;
+
+	    ImGui.getForegroundDrawList().addText(
+	        screenX, screenY,
+	        ImGui.colorConvertFloat4ToU32(0.9f, 0.9f, 0.9f, 1.0f),
+	        text
+	    );
+		
+	}
+	
+	//Render UI
+    private void renderUI(Simulation sim) {
+    	//check if the UI is hidden or being shown
+    	if (!showUI) {
+            // Show only the small toggle button when hidden
+            ImGui.setNextWindowPos(10, 10, imgui.flag.ImGuiCond.Always);
+            ImGui.setNextWindowSize(90, 30, imgui.flag.ImGuiCond.Always);
+            ImGui.begin("##toggle_collapsed",
+                new ImBoolean(true),
+                imgui.flag.ImGuiWindowFlags.NoTitleBar |
+                imgui.flag.ImGuiWindowFlags.NoResize |
+                imgui.flag.ImGuiWindowFlags.NoScrollbar |
+                imgui.flag.ImGuiWindowFlags.NoCollapse |
+                imgui.flag.ImGuiWindowFlags.NoMove
+            );
+            if (ImGui.button("Controls", 74, 18)) {
+                showUI = true;
+            }
+            ImGui.end();
+            return;
+        }
+    
+    	
+    	//pin the window to the top left corner
+    	ImGui.setNextWindowPos(10, 10, imgui.flag.ImGuiCond.Always);
+    	ImGui.setNextWindowSize(410, 420, imgui.flag.ImGuiCond.Always);
+    	ImGui.begin("Simulation Controls",
+    		imgui.flag.ImGuiWindowFlags.NoCollapse |
+    		imgui.flag.ImGuiWindowFlags.NoResize |
+    		imgui.flag.ImGuiWindowFlags.NoMove
+    		);
+    	
+    	//Hide UI button
+    	ImGui.sameLine();
+    		if (ImGui.button("Hide UI", 74, 18)) {
+            showUI = false;
+        }
+    	
+    	//simulation text
+    	ImGui.text("Simulation");
+    	
+    	//time slider
+    	float[] dt = { (float) sim.dt };
+    	if (ImGui.sliderFloat("Timestep (s)", dt, 3600f, 604800)) {
+    		sim.dt = dt[0];
+    	}
+    	ImGui.sameLine();
+    	ImGui.textDisabled("(?)");
+    	if (ImGui.isItemHovered()) {
+    		ImGui.setTooltip("Seconds simulated per step. \n 3600 = 1 hour, 86400 = 1 day");
+    	}
+    	
+    	//Theta slider
+    	float[] theta = { (float) sim.getTree().getTheta()};
+    	if (ImGui.sliderFloat("Theta", theta, 0.1f, 2.0f)) {
+    		sim.setTheta(theta[0]);
+    	}
+    	ImGui.sameLine();
+    	ImGui.textDisabled("(?)");
+    	if (ImGui.isItemHovered()) {
+    		ImGui.setTooltip("Barnes-Hut accuracy threshold. \n Lower = more accurate, more computing \n Higher = less accurate, faster");
+    	}
+    	
+    	//Pause, reset, and hide Button
+    	ImGui.spacing();
+        if (ImGui.button(sim.isPaused() ? "Resume" : "Pause", 120, 24)) {
+            sim.togglePause();
+        }
+        ImGui.sameLine();
+        if (ImGui.button("Reset", 120, 24)) {
+            sim.reset();
+        }
+        
+        // Save and Load
+        ImGui.inputText("File", saveFilePath);
+        ImGui.spacing();
+        
+        if (ImGui.button("Save",84, 24)) {
+        	try {
+        		String path = "saves/" + saveFilePath.get() + ".json";
+        		new java.io.File("saves").mkdirs();
+        		SimulationIO.save(sim,  path);
+        		saveStatusMessage = "Saved: " + path;
+        	} catch (Exception e){
+        		saveStatusMessage = "Save Failed: " + e.getMessage();
+        	}
+        }
+        
+        ImGui.sameLine();
+        if (ImGui.button("Load", 84, 24)) {
+            try {
+                String path = "saves/" + saveFilePath.get() + ".json";
+                SimulationIO.load(sim, path);
+                saveStatusMessage = "Loaded: " + path;
+            } catch (Exception e) {
+                saveStatusMessage = "Load failed: " + e.getMessage();
+            }
+        }
+        ImGui.sameLine();
+        if (ImGui.button("Clear", 84, 24)) {
+            sim.clear();
+            saveStatusMessage = "Simulation cleared";
+        }
+
+        if (!saveStatusMessage.isEmpty()) {
+            ImGui.spacing();
+            ImGui.textDisabled(saveStatusMessage);
+        }
+        
+        
+    	//Debug Overlays
+        ImGui.spacing();
+        ImGui.text("Debug Overlays");
+        
+        ImBoolean velVec = new ImBoolean(showVelocityVectors);
+        ImBoolean accVec = new ImBoolean(showAccelerationVectors);
+        ImBoolean qtree = new ImBoolean(showQuadTree);
+        
+        if (ImGui.checkbox("Velocity Vectors  [V]", velVec))
+            showVelocityVectors = velVec.get();
+        if (ImGui.checkbox("Acceleration Vectors  [A]", accVec))
+            showAccelerationVectors = accVec.get();
+        if (ImGui.checkbox("Quadtree Grid  [Q]", qtree))
+            showQuadTree = qtree.get();
+       
+        //Stats
+       
+        ImGui.spacing();
+        ImGui.text("Stats");
+        ImGui.text("Bodies : " + sim.getBodyCount());
+        ImGui.text(String.format("dt: %.0f s (%.2f days)", sim.dt, sim.dt / 86400.0));
+        ImGui.text(String.format("Theta: %.2f", sim.getTree().getTheta()));
+        ImGui.text(String.format("Zoom: %.4f", camera.zoom));
+        
+        ImGui.end();
+    }
+    
+	//vector rendering
 	private void renderVelocityVectors(List<Body> bodies) {
 		float[] verts = new float[bodies.size() * 6];
 		for (int i = 0; i < bodies.size(); i++) {
@@ -226,7 +459,7 @@ public class SimulationRenderer {
         uploadAndDraw(verts, GL_LINES, 0.2f, 0.6f, 1.0f, 0.8f); // blue
 	}
 	
-	 private void renderAccelerationVectors(List<Body> bodies) {
+	private void renderAccelerationVectors(List<Body> bodies) {
         float[] verts = new float[bodies.size() * 6];
         for (int i = 0; i < bodies.size(); i++) {
             Body b   = bodies.get(i);
@@ -240,9 +473,8 @@ public class SimulationRenderer {
         uploadAndDraw(verts, GL_LINES, 1.0f, 0.4f, 0.2f, 0.8f); // orange
     }
 	 
-	 // Quad Tree Rendering
-	 
-	 private void renderQuadTree(QuadTreeNode node) {
+	// Quad Tree Rendering
+	private void renderQuadTree(QuadTreeNode node) {
 	        if (node == null || node.isEmpty()) return;
 	        BoundingBox b  = node.boundary;
 	        float x0 = (float)((b.x - b.halfWidth) * WORLD_SCALE);
@@ -261,11 +493,11 @@ public class SimulationRenderer {
 	                renderQuadTree(child);
 	            }
 	        }
-	    }
+	}
 	 
-	 //GL Helpers
+	//GL Helpers
 	 
-	 private void uploadAndDraw(float[] verts, int mode, float r, float g, float b, float a) {
+	private void uploadAndDraw(float[] verts, int mode, float r, float g, float b, float a) {
 			glBindVertexArray(vao);
 			glBindBuffer(GL_ARRAY_BUFFER, vbo);
 			
@@ -279,391 +511,267 @@ public class SimulationRenderer {
 			
 			glDrawArrays(mode, 0, verts.length / 3);
 			glBindVertexArray(0);
-		}
+	}
 			
-		private void setUniformMatrix(Matrix4f mat) {
-			FloatBuffer buf = MemoryUtil.memAllocFloat(16);
-			mat.get(buf);
-			int loc = glGetUniformLocation(shaderProgram, "uMVP");
-			glUniformMatrix4fv(loc, false, buf);
-			MemoryUtil.memFree(buf);
-		}	
-			
-	// shaders
+	private void setUniformMatrix(Matrix4f mat) {
+		FloatBuffer buf = MemoryUtil.memAllocFloat(16);
+		mat.get(buf);
+		int loc = glGetUniformLocation(shaderProgram, "uMVP");
+		glUniformMatrix4fv(loc, false, buf);
+		MemoryUtil.memFree(buf);
+	}	
 		
-		private void setupShaders() {
-			String vertSrc =
-			    "#version 330 core\n" +
-			    "layout(location = 0) in vec3 aPos;\n" +
-			    "uniform mat4 uMVP;\n" +
-			    "void main() {\n" +
-			    "    gl_Position = uMVP * vec4(aPos, 1.0);\n" +
-			    "}\n";
+	// shaders	
+	private void setupShaders() {
+		String vertSrc =
+		    "#version 330 core\n" +
+		    "layout(location = 0) in vec3 aPos;\n" +
+		    "uniform mat4 uMVP;\n" +
+		    "void main() {\n" +
+		    "    gl_Position = uMVP * vec4(aPos, 1.0);\n" +
+		    "}\n";
 
-	        String fragSrc =
-	            "#version 330 core\n" +
-	            "uniform vec4 uColor;\n" +
-	            "out vec4 FragColor;\n" +
-	            "void main() {\n" +
-	            "    FragColor = uColor;\n" +
-	            "}\n";
+        String fragSrc =
+            "#version 330 core\n" +
+            "uniform vec4 uColor;\n" +
+            "out vec4 FragColor;\n" +
+            "void main() {\n" +
+            "    FragColor = uColor;\n" +
+            "}\n";
 
-	        int vert = glCreateShader(GL_VERTEX_SHADER);
-	        glShaderSource(vert, vertSrc);
-	        glCompileShader(vert);
-	        checkShader(vert, "vertex");
+        int vert = glCreateShader(GL_VERTEX_SHADER);
+        glShaderSource(vert, vertSrc);
+        glCompileShader(vert);
+        checkShader(vert, "vertex");
 
-	        int frag = glCreateShader(GL_FRAGMENT_SHADER);
-	        glShaderSource(frag, fragSrc);
-	        glCompileShader(frag);
-	        checkShader(frag, "fragment");
+        int frag = glCreateShader(GL_FRAGMENT_SHADER);
+        glShaderSource(frag, fragSrc);
+        glCompileShader(frag);
+        checkShader(frag, "fragment");
 
-	        shaderProgram = glCreateProgram();
-	        glAttachShader(shaderProgram, vert);
-	        glAttachShader(shaderProgram, frag);
-	        glLinkProgram(shaderProgram);
+        shaderProgram = glCreateProgram();
+        glAttachShader(shaderProgram, vert);
+        glAttachShader(shaderProgram, frag);
+        glLinkProgram(shaderProgram);
 
-	        glDeleteShader(vert);
-	        glDeleteShader(frag);
-	    }
-		
-		private void setupBackground() {
-			// Full screen quad — two triangles covering NDC space
-		    float[] verts = {
-		        -1f, -1f, 0f,  0f, 0f,
-		         1f, -1f, 0f,  1f, 0f,
-		         1f,  1f, 0f,  1f, 1f,
-		        -1f, -1f, 0f,  0f, 0f,
-		         1f,  1f, 0f,  1f, 1f,
-		        -1f,  1f, 0f,  0f, 1f,
-		    };
-		    
-		    backgroundVao = glGenVertexArrays();
-		    backgroundVbo = glGenBuffers();
-		    
-		    glBindVertexArray(backgroundVao);
-		    glBindBuffer(GL_ARRAY_BUFFER, backgroundVbo);
-		    
-		    FloatBuffer buf = MemoryUtil.memAllocFloat(verts.length);
-		    buf.put(verts).flip();
-		    glBufferData(GL_ARRAY_BUFFER, buf, GL_STATIC_DRAW);
-		    MemoryUtil.memFree(buf);
-		    
-		    // position attribute: location 0, 3 floats, stride 5 floats
-		    glVertexAttribPointer(0, 3, GL_FLOAT, false, 5 * Float.BYTES, 0);
-		    glEnableVertexAttribArray(0);
-		    
-		    // uv attribute: location 1, 2 floats, stride 5 floats, offset 3
-		    glVertexAttribPointer(1, 2, GL_FLOAT, false,
-		        5 * Float.BYTES, 3 * Float.BYTES);
-		    glEnableVertexAttribArray(1);
-
-		    glBindVertexArray(0);
-		    
-		    // Background shader
-		    String vertSrc =
-		        "#version 330 core\n" +
-		        "layout(location = 0) in vec3 aPos;\n" +
-		        "layout(location = 1) in vec2 aUV;\n" +
-		        "out vec2 vUV;\n" +
-		        "void main() {\n" +
-		        "    gl_Position = vec4(aPos, 1.0);\n" +
-		        "    vUV = aUV;\n" +
-		        "}\n";
-
-		    String fragSrc =
-		        "#version 330 core\n" +
-		        "in vec2 vUV;\n" +
-		        "uniform sampler2D uTexture;\n" +
-		        "out vec4 FragColor;\n" +
-		        "void main() {\n" +
-		        "    FragColor = texture(uTexture, vUV);\n" +
-		        "}\n";
-		    
-		    int vert = glCreateShader(GL_VERTEX_SHADER);
-		    glShaderSource(vert, vertSrc);
-		    glCompileShader(vert);
-		    checkShader(vert, "background vertex");
-		    
-		    int frag = glCreateShader(GL_FRAGMENT_SHADER);
-		    glShaderSource(frag, fragSrc);
-		    glCompileShader(frag);
-		    checkShader(frag, "background fragment");
-		    
-		    backgroundShader = glCreateProgram();
-		    glAttachShader(backgroundShader, vert);
-		    glAttachShader(backgroundShader, frag);
-		    glLinkProgram(backgroundShader);
-		    
-		    glDeleteShader(vert);
-		    glDeleteShader(frag);
-		}
-
-	    private void checkShader(int shader, String name) {
-	        if (glGetShaderi(shader, GL_COMPILE_STATUS) == GL_FALSE) {
-	            throw new RuntimeException(name + " shader error: "
-	                + glGetShaderInfoLog(shader));
-	        }
-	    }
-
-	    // buffers
-	    private void setupBuffers() {
-	    	vao = glGenVertexArrays();
-	        vbo = glGenBuffers();
-
-	        glBindVertexArray(vao);
-	        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	        glVertexAttribPointer(0, 3, GL_FLOAT, false, 0, 0);
-	        glEnableVertexAttribArray(0);
-	        glBindVertexArray(0);
-	    }
+        glDeleteShader(vert);
+        glDeleteShader(frag);
+    }
+	
+	private void setupBackground() {
+		// Full screen quad — two triangles covering NDC space
+	    float[] verts = {
+	        -1f, -1f, 0f,  0f, 0f,
+	         1f, -1f, 0f,  1f, 0f,
+	         1f,  1f, 0f,  1f, 1f,
+	        -1f, -1f, 0f,  0f, 0f,
+	         1f,  1f, 0f,  1f, 1f,
+	        -1f,  1f, 0f,  0f, 1f,
+	    };
 	    
-	    //input callbacks
+	    backgroundVao = glGenVertexArrays();
+	    backgroundVbo = glGenBuffers();
 	    
-	    private void setupCallbacks() {
-	        glfwSetFramebufferSizeCallback(windowHandle, (win, w, h) -> {
-	            windowWidth  = w;
-	            windowHeight = h;
-	            glViewport(0, 0, w, h);
-	        });
-
-	        glfwSetScrollCallback(windowHandle, (win, dx, dy) -> {
-	            camera.zoom(dy > 0 ? 1.1f : 0.9f);
-	        });
-
-	        glfwSetMouseButtonCallback(windowHandle, (win, button, action, mods) -> {
-	            if (button == GLFW_MOUSE_BUTTON_RIGHT) {
-	            	//Only pan in the simluation area, not the UI
-	            	if (action == GLFW_PRESS && !ImGui.isWindowHovered(imgui.flag.ImGuiHoveredFlags.AnyWindow)) {
-	            		mouseDown = true;
-	            	} else if (action == GLFW_RELEASE) {
-	            		mouseDown = false;
-	            	}
-		                double[] mx = new double[1], my = new double[1];
-		                glfwGetCursorPos(win, mx, my);
-		                lastMouseX = mx[0];
-		                lastMouseY = my[0];
-	            }
-	        });
-
-	        glfwSetCursorPosCallback(windowHandle, (win, mx, my) -> {
-	            if (mouseDown && !ImGui.isWindowHovered(imgui.flag.ImGuiHoveredFlags.AnyWindow)) {
-	            	 float dx = (float)(mx - lastMouseX);
-	                 float dy = (float)(my - lastMouseY);
-
-	                 // Negate dx and dy so dragging right moves the world right
-	                 // (camera moves opposite to finger — tablet/map behaviour)
-	                 // viewSize controls how much world space one pixel represents
-	                 float viewSize = 20.0f / camera.zoom;
-	                 float pixelsToWorld = (viewSize * 2) / windowWidth;
-
-	                 camera.pan(-dx * pixelsToWorld, dy * pixelsToWorld);
-
-	                 lastMouseX = mx;
-	                 lastMouseY = my;
-	            }
-	        });
-
-	        glfwSetKeyCallback(windowHandle, (win, key, scancode, action, mods) -> {
-	            if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-	                glfwSetWindowShouldClose(win, true);
-	            }
-	            if (key == GLFW_KEY_V && action == GLFW_PRESS) {
-	                showVelocityVectors = !showVelocityVectors;
-	            }
-	            if (key == GLFW_KEY_A && action == GLFW_PRESS) {
-	                showAccelerationVectors = !showAccelerationVectors;
-	            }
-	            if (key == GLFW_KEY_Q && action == GLFW_PRESS) {
-	                showQuadTree = !showQuadTree;
-	            }
-	        });
-	    }
+	    glBindVertexArray(backgroundVao);
+	    glBindBuffer(GL_ARRAY_BUFFER, backgroundVbo);
 	    
-	    // Window State
+	    FloatBuffer buf = MemoryUtil.memAllocFloat(verts.length);
+	    buf.put(verts).flip();
+	    glBufferData(GL_ARRAY_BUFFER, buf, GL_STATIC_DRAW);
+	    MemoryUtil.memFree(buf);
 	    
-	    public boolean shouldClose() {
-	        return glfwWindowShouldClose(windowHandle);
-	    }
+	    // position attribute: location 0, 3 floats, stride 5 floats
+	    glVertexAttribPointer(0, 3, GL_FLOAT, false, 5 * Float.BYTES, 0);
+	    glEnableVertexAttribArray(0);
+	    
+	    // uv attribute: location 1, 2 floats, stride 5 floats, offset 3
+	    glVertexAttribPointer(1, 2, GL_FLOAT, false,
+	        5 * Float.BYTES, 3 * Float.BYTES);
+	    glEnableVertexAttribArray(1);
 
-	    public void cleanup() {
-	    	imguiGl3.dispose();
-	    	imguiGlfw.dispose();
-	    	ImGui.destroyContext();
-	    	
-	        glDeleteVertexArrays(vao);
-	        glDeleteBuffers(vbo);
-	        glDeleteProgram(shaderProgram);
-	        glfwDestroyWindow(windowHandle);
-	        glfwTerminate();
-	    }
+	    glBindVertexArray(0);
 	    
-	    //Render UI
+	    // Background shader
+	    String vertSrc =
+	        "#version 330 core\n" +
+	        "layout(location = 0) in vec3 aPos;\n" +
+	        "layout(location = 1) in vec2 aUV;\n" +
+	        "out vec2 vUV;\n" +
+	        "void main() {\n" +
+	        "    gl_Position = vec4(aPos, 1.0);\n" +
+	        "    vUV = aUV;\n" +
+	        "}\n";
+
+	    String fragSrc =
+	        "#version 330 core\n" +
+	        "in vec2 vUV;\n" +
+	        "uniform sampler2D uTexture;\n" +
+	        "out vec4 FragColor;\n" +
+	        "void main() {\n" +
+	        "    FragColor = texture(uTexture, vUV);\n" +
+	        "}\n";
 	    
-	    private void renderUI(Simulation sim) {
-	    	//check if the UI is hidden or being shown
-	    	if (!showUI) {
-	            // Show only the small toggle button when hidden
-	            ImGui.setNextWindowPos(10, 10, imgui.flag.ImGuiCond.Always);
-	            ImGui.setNextWindowSize(90, 30, imgui.flag.ImGuiCond.Always);
-	            ImGui.begin("##toggle_collapsed",
-	                new ImBoolean(true),
-	                imgui.flag.ImGuiWindowFlags.NoTitleBar |
-	                imgui.flag.ImGuiWindowFlags.NoResize |
-	                imgui.flag.ImGuiWindowFlags.NoScrollbar |
-	                imgui.flag.ImGuiWindowFlags.NoCollapse |
-	                imgui.flag.ImGuiWindowFlags.NoMove
-	            );
-	            if (ImGui.button("Controls", 74, 18)) {
-	                showUI = true;
-	            }
-	            ImGui.end();
-	            return;
-	        }
+	    int vert = glCreateShader(GL_VERTEX_SHADER);
+	    glShaderSource(vert, vertSrc);
+	    glCompileShader(vert);
+	    checkShader(vert, "background vertex");
 	    
-	    	
-	    	//pin the window to the top left corner
-	    	ImGui.setNextWindowPos(10, 10, imgui.flag.ImGuiCond.Always);
-	    	ImGui.setNextWindowSize(410, 420, imgui.flag.ImGuiCond.Always);
-	    	ImGui.begin("Simulation Controls",
-	    		imgui.flag.ImGuiWindowFlags.NoCollapse |
-	    		imgui.flag.ImGuiWindowFlags.NoResize |
-	    		imgui.flag.ImGuiWindowFlags.NoMove
-	    		);
-	    	
-	    	//Hide UI button
-	    	ImGui.sameLine();
-	    		if (ImGui.button("Hide UI", 74, 18)) {
-	            showUI = false;
+	    int frag = glCreateShader(GL_FRAGMENT_SHADER);
+	    glShaderSource(frag, fragSrc);
+	    glCompileShader(frag);
+	    checkShader(frag, "background fragment");
+	    
+	    backgroundShader = glCreateProgram();
+	    glAttachShader(backgroundShader, vert);
+	    glAttachShader(backgroundShader, frag);
+	    glLinkProgram(backgroundShader);
+	    
+	    glDeleteShader(vert);
+	    glDeleteShader(frag);
+	}
+
+    private void checkShader(int shader, String name) {
+        if (glGetShaderi(shader, GL_COMPILE_STATUS) == GL_FALSE) {
+            throw new RuntimeException(name + " shader error: "
+                + glGetShaderInfoLog(shader));
+        }
+    }
+
+    // buffers
+    private void setupBuffers() {
+    	vao = glGenVertexArrays();
+        vbo = glGenBuffers();
+
+        glBindVertexArray(vao);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glVertexAttribPointer(0, 3, GL_FLOAT, false, 0, 0);
+        glEnableVertexAttribArray(0);
+        glBindVertexArray(0);
+    }
+    
+    //input callbacks 
+    private void setupCallbacks() {
+        glfwSetFramebufferSizeCallback(windowHandle, (win, w, h) -> {
+            windowWidth  = w;
+            windowHeight = h;
+            glViewport(0, 0, w, h);
+        });
+
+        glfwSetScrollCallback(windowHandle, (win, dx, dy) -> {
+            // Get mouse position in screen pixels
+            double[] mx = new double[1], my = new double[1];
+            glfwGetCursorPos(win, mx, my);
+
+            // Convert mouse screen position to world space BEFORE zooming
+            float worldBeforeX = screenToWorld((float)mx[0], (float)my[0])[0];
+            float worldBeforeY = screenToWorld((float)mx[0], (float)my[0])[1];
+
+            // Apply zoom
+            camera.zoom(dy > 0 ? 1.1f : 0.9f);
+
+            // Convert same screen position to world space AFTER zooming
+            float worldAfterX = screenToWorld((float)mx[0], (float)my[0])[0];
+            float worldAfterY = screenToWorld((float)mx[0], (float)my[0])[1];
+
+            // Pan camera by the difference to keep the point under the mouse fixed
+            camera.x -= (worldAfterX - worldBeforeX);
+            camera.y -= (worldAfterY - worldBeforeY);
+        });
+
+        glfwSetMouseButtonCallback(windowHandle, (win, button, action, mods) -> {
+            if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+            	//Only pan in the simluation area, not the UI
+            	if (action == GLFW_PRESS && !ImGui.isWindowHovered(imgui.flag.ImGuiHoveredFlags.AnyWindow)) {
+            		mouseDown = true;
+            	} else if (action == GLFW_RELEASE) {
+            		mouseDown = false;
+            	}
+	                double[] mx = new double[1], my = new double[1];
+	                glfwGetCursorPos(win, mx, my);
+	                lastMouseX = mx[0];
+	                lastMouseY = my[0];
+	                
+	                //DEBUGGING
+	                //System.out.println("camera.x raw: " + camera.x + "  scaled: " + (camera.x * WORLD_SCALE));
             }
-	    	
-	    	//simulation text
-	    	ImGui.text("Simulation");
-	    	
-	    	//time slider
-	    	float[] dt = { (float) sim.dt };
-	    	if (ImGui.sliderFloat("Timestep (s)", dt, 3600f, 604800)) {
-	    		sim.dt = dt[0];
-	    	}
-	    	ImGui.sameLine();
-	    	ImGui.textDisabled("(?)");
-	    	if (ImGui.isItemHovered()) {
-	    		ImGui.setTooltip("Seconds simulated per step. \n 3600 = 1 hour, 86400 = 1 day");
-	    	}
-	    	
-	    	//Theta slider
-	    	float[] theta = { (float) sim.getTree().getTheta()};
-	    	if (ImGui.sliderFloat("Theta", theta, 0.1f, 2.0f)) {
-	    		sim.setTheta(theta[0]);
-	    	}
-	    	ImGui.sameLine();
-	    	ImGui.textDisabled("(?)");
-	    	if (ImGui.isItemHovered()) {
-	    		ImGui.setTooltip("Barnes-Hut accuracy threshold. \n Lower = more accurate, more computing \n Higher = less accurate, faster");
-	    	}
-	    	
-	    	//Pause, reset, and hide Button
-	    	ImGui.spacing();
-	        if (ImGui.button(sim.isPaused() ? "Resume" : "Pause", 120, 24)) {
-	            sim.togglePause();
-	        }
-	        ImGui.sameLine();
-	        if (ImGui.button("Reset", 120, 24)) {
-	            sim.reset();
-	        }
-	        
-	        // Save and Load
-	        ImGui.inputText("File", saveFilePath);
-	        ImGui.spacing();
-	        
-	        if (ImGui.button("Save",84, 24)) {
-	        	try {
-	        		String path = "saves/" + saveFilePath.get() + ".json";
-	        		new java.io.File("saves").mkdirs();
-	        		SimulationIO.save(sim,  path);
-	        		saveStatusMessage = "Saved: " + path;
-	        	} catch (Exception e){
-	        		saveStatusMessage = "Save Failed: " + e.getMessage();
-	        	}
-	        }
-	        
-	        ImGui.sameLine();
-	        if (ImGui.button("Load", 84, 24)) {
-	            try {
-	                String path = "saves/" + saveFilePath.get() + ".json";
-	                SimulationIO.load(sim, path);
-	                saveStatusMessage = "Loaded: " + path;
-	            } catch (Exception e) {
-	                saveStatusMessage = "Load failed: " + e.getMessage();
-	            }
-	        }
-	        ImGui.sameLine();
-	        if (ImGui.button("Clear", 84, 24)) {
-	            sim.clear();
-	            saveStatusMessage = "Simulation cleared";
-	        }
+        });
 
-	        if (!saveStatusMessage.isEmpty()) {
-	            ImGui.spacing();
-	            ImGui.textDisabled(saveStatusMessage);
-	        }
-	        
-	        
-	    	//Debug Overlays
-	        ImGui.spacing();
-	        ImGui.text("Debug Overlays");
-	        
-	        ImBoolean velVec = new ImBoolean(showVelocityVectors);
-	        ImBoolean accVec = new ImBoolean(showAccelerationVectors);
-	        ImBoolean qtree = new ImBoolean(showQuadTree);
-	        
-	        if (ImGui.checkbox("Velocity Vectors  [V]", velVec))
-	            showVelocityVectors = velVec.get();
-	        if (ImGui.checkbox("Acceleration Vectors  [A]", accVec))
-	            showAccelerationVectors = accVec.get();
-	        if (ImGui.checkbox("Quadtree Grid  [Q]", qtree))
-	            showQuadTree = qtree.get();
-	       
-	        //Stats
-	       
-	        ImGui.spacing();
-	        ImGui.text("Stats");
-	        ImGui.text("Bodies : " + sim.getBodyCount());
-	        ImGui.text(String.format("dt: %.0f s (%.2f days)", sim.dt, sim.dt / 86400.0));
-	        ImGui.text(String.format("Theta: %.2f", sim.getTree().getTheta()));
-	        ImGui.text(String.format("Zoom: %.4f", camera.zoom));
-	        
-	        ImGui.end();
-	    }
-	    
-	    //Background Texture
-	    private int loadTexture(String path) {
-	    	int[] width = new int[1];
-	    	int[] height =new int[1];
-	    	int[] channels = new int[1];
-	    	
-	    	org.lwjgl.stb.STBImage.stbi_set_flip_vertically_on_load(true);
-	    	java.nio.ByteBuffer image = org.lwjgl.stb.STBImage.stbi_load(
-	    			path, width, height, channels, 4);
-	    	
-	    	if (image == null) {
-	    		throw new RuntimeException("Failed to load texture: " + path + " -- " + org.lwjgl.stb.STBImage.stbi_failure_reason());
-	    	}
-	    	
-	    	int textureId = glGenTextures();
-	    	glBindTexture(GL_TEXTURE_2D, textureId);
-	    	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	    	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width[0], height[0], 0, GL_RGBA, GL_UNSIGNED_BYTE, image);
-	        
-	        org.lwjgl.stb.STBImage.stbi_image_free(image);
-	        return textureId;
-	    }
-	    
-	    
-	    
+        glfwSetCursorPosCallback(windowHandle, (win, mx, my) -> {
+            if (mouseDown && !ImGui.isWindowHovered(imgui.flag.ImGuiHoveredFlags.AnyWindow)) {
+            	 float dx = (float)(mx - lastMouseX);
+                 float dy = (float)(my - lastMouseY);
+
+                 // Negate dx and dy so dragging right moves the world right
+                 // (camera moves opposite to finger — tablet/map behaviour)
+                 // viewSize controls how much world space one pixel represents
+                 float viewSize = 20.0f / camera.zoom;
+                 float pixelsToWorld = (viewSize * 2) / windowWidth;
+
+                 camera.pan(-dx * pixelsToWorld, dy * pixelsToWorld);
+
+                 lastMouseX = mx;
+                 lastMouseY = my;
+            }
+        });
+
+        glfwSetKeyCallback(windowHandle, (win, key, scancode, action, mods) -> {
+            if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+                glfwSetWindowShouldClose(win, true);
+            }
+            if (key == GLFW_KEY_V && action == GLFW_PRESS) {
+                showVelocityVectors = !showVelocityVectors;
+            }
+            if (key == GLFW_KEY_A && action == GLFW_PRESS) {
+                showAccelerationVectors = !showAccelerationVectors;
+            }
+            if (key == GLFW_KEY_Q && action == GLFW_PRESS) {
+                showQuadTree = !showQuadTree;
+            }
+        });
+    }
+    
+    // Window State
+    public boolean shouldClose() {
+        return glfwWindowShouldClose(windowHandle);
+    }
+
+    public void cleanup() {
+    	imguiGl3.dispose();
+    	imguiGlfw.dispose();
+    	ImGui.destroyContext();
+    	
+        glDeleteVertexArrays(vao);
+        glDeleteBuffers(vbo);
+        glDeleteProgram(shaderProgram);
+        glfwDestroyWindow(windowHandle);
+        glfwTerminate();
+    }
+        
+    //Background Texture
+    private int loadTexture(String path) {
+    	int[] width = new int[1];
+    	int[] height =new int[1];
+    	int[] channels = new int[1];
+    	
+    	org.lwjgl.stb.STBImage.stbi_set_flip_vertically_on_load(true);
+    	java.nio.ByteBuffer image = org.lwjgl.stb.STBImage.stbi_load(
+    			path, width, height, channels, 4);
+    	
+    	if (image == null) {
+    		throw new RuntimeException("Failed to load texture: " + path + " -- " + org.lwjgl.stb.STBImage.stbi_failure_reason());
+    	}
+    	
+    	int textureId = glGenTextures();
+    	glBindTexture(GL_TEXTURE_2D, textureId);
+    	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width[0], height[0], 0, GL_RGBA, GL_UNSIGNED_BYTE, image);
+        
+        org.lwjgl.stb.STBImage.stbi_image_free(image);
+        return textureId;
+    }    
 }
 
 
