@@ -4,12 +4,14 @@ import com.gravitysim.core.Body;
 import com.gravitysim.core.BodyFactory;
 import com.gravitysim.core.Simulation;
 import com.gravitysim.core.SimulationIO;
+import com.gravitysim.core.Vector2D;
 import com.gravitysim.tree.*;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.*;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.FloatBuffer;
+import java.util.ArrayList;
 import java.util.List;
 
 import imgui.ImGui;
@@ -71,6 +73,10 @@ public class SimulationRenderer {
 	private BodyFactory bodyFactory = new BodyFactory();
 	private boolean justCommittedBody = false;
 	
+	//body trails
+	public boolean showTrails = true;
+	private static final int ORBIT_PROJECTION_STEPS = 5000;
+	
 	//Tracking Indicators
 	private static final float TRACKING_THRESHOLD_PX = 8f;
 	
@@ -130,19 +136,18 @@ public class SimulationRenderer {
 		
 		glUseProgram(shaderProgram);
 		setUniformMatrix(mvp);
-		
-		imguiGlfw.newFrame();
-		ImGui.newFrame();
 
 		renderBodies(sim.getBodies());
-
+		if(showTrails) { renderTrails(sim.getBodies()); }
 		if (showVelocityVectors) { renderVelocityVectors(sim.getBodies()); }
 		if (showAccelerationVectors) { renderAccelerationVectors(sim.getBodies()); }
 		if (showQuadTree) { renderQuadTree(sim.getTree().getRoot()); }
 
+		imguiGlfw.newFrame();
+	    ImGui.newFrame();
+		
 		renderUI(sim);
 		renderBodyFactory(sim);
-        
 		renderTrackingIndicators(sim.getBodies());
         
 		ImGui.render();
@@ -297,6 +302,8 @@ public class SimulationRenderer {
         ImBoolean velVec = new ImBoolean(showVelocityVectors);
         ImBoolean accVec = new ImBoolean(showAccelerationVectors);
         ImBoolean qtree = new ImBoolean(showQuadTree);
+        ImBoolean trails = new ImBoolean(showTrails);
+        
         
         if (ImGui.checkbox("Velocity Vectors  [V]", velVec))
             showVelocityVectors = velVec.get();
@@ -304,6 +311,8 @@ public class SimulationRenderer {
             showAccelerationVectors = accVec.get();
         if (ImGui.checkbox("Quadtree Grid  [Q]", qtree))
             showQuadTree = qtree.get();
+        if (ImGui.checkbox("Orbital Trails [T]", trails))
+            showTrails = trails.get();
        
         //Stats
        
@@ -376,6 +385,7 @@ public class SimulationRenderer {
 				// Show solid preview circle that will update as radius slider changes
 				renderCircle(bodyFactory.getClickWorldX(), bodyFactory.getClickWorldY(), 0.2f, 0.8f, 1.0f, 0.7f); // blue
 				drawVelocityPreview();
+				renderProjectedOrbit(sim);
 				break;
                 
 			default:
@@ -410,7 +420,7 @@ public class SimulationRenderer {
 		// Properties HUD
         ImGui.setNextWindowPos(windowWidth - 350, 10,
             imgui.flag.ImGuiCond.Always);
-        ImGui.setNextWindowSize(340, 280,
+        ImGui.setNextWindowSize(340, 350,
             imgui.flag.ImGuiCond.Always);
         ImGui.begin("New Body",
             imgui.flag.ImGuiWindowFlags.NoCollapse |
@@ -499,6 +509,15 @@ public class SimulationRenderer {
 	}
 	
 	//Render Tracking Lines
+	private void debugDrawLine() {
+	    glUseProgram(shaderProgram);
+	    float[] verts = {
+	        -5.0f,  0.0f, 0.0f,
+	         5.0f,  0.0f, 0.0f
+	    };
+	    uploadAndDraw(verts, GL_LINES, 1.0f, 0.0f, 0.0f, 1.0f); // bright red
+	}
+	
 	private void renderTrackingIndicators(List<Body> bodies) {
 	    // Leader line lengths in screen pixels — converted to world space
 	    float viewSize       = 20.0f / camera.zoom;
@@ -509,6 +528,8 @@ public class SimulationRenderer {
 
 	    for (Body b : bodies) {
 	        if (!b.trackable) continue;
+	        
+//	        System.out.println("Drawing trail for: " + b.getDisplayName() + " points: " + b.trail.size());
 
 	        // Calculate screen-space radius to check threshold
 	        float worldRadius  = (float)(b.radius * WORLD_SCALE);
@@ -557,6 +578,138 @@ public class SimulationRenderer {
 	    );
 	}
 	
+	//Render Trails
+	public void renderTrails(List<Body> bodies) {
+		glUseProgram(shaderProgram);
+
+	    for (Body b : bodies) {
+	        if (!b.trackable || b.trail.size() < 2) continue;
+
+	        Vector2D[] points = b.trail.toArray(new Vector2D[0]);
+	        int count = points.length;
+
+	        // Build full vertex array
+	        float[] verts = new float[count * 3];
+	        for (int i = 0; i < count; i++) {
+	            verts[i * 3]     = (float)(points[i].x * WORLD_SCALE);
+	            verts[i * 3 + 1] = (float)(points[i].y * WORLD_SCALE);
+	            verts[i * 3 + 2] = 0.0f;
+	        }
+
+	        // Draw in 5 fading segments
+	        int segmentSize = Math.max(1, count / 5);
+	        for (int seg = 0; seg < 5; seg++) {
+	            int start = seg * segmentSize;
+	            int end   = (seg == 4) ? count : Math.min((seg + 1) * segmentSize, count);
+	            if (end - start < 2) continue;
+
+	            int vertCount    = end - start;
+	            float[] segVerts = new float[vertCount * 3];
+	            for (int i = 0; i < vertCount; i++) {
+	                int idx = (start + i) * 3;
+	                if (idx + 1 >= verts.length) break;
+	                segVerts[i * 3]     = verts[idx];
+	                segVerts[i * 3 + 1] = verts[idx + 1];
+	                segVerts[i * 3 + 2] = 0.0f;
+	            }
+
+	            float alpha = 0.1f + (seg * 0.18f);
+
+	            // bypasses uploadAndDraw VAO state issues I was having
+	            glBindVertexArray(vao);
+	            glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
+	            FloatBuffer buf = MemoryUtil.memAllocFloat(segVerts.length);
+	            buf.put(segVerts).flip();
+	            glBufferData(GL_ARRAY_BUFFER, buf, GL_DYNAMIC_DRAW);
+	            MemoryUtil.memFree(buf);
+
+	            glVertexAttribPointer(0, 3, GL_FLOAT, false, 0, 0);
+	            glEnableVertexAttribArray(0);
+
+	            int colorLoc = glGetUniformLocation(shaderProgram, "uColor");
+	            glUniform4f(colorLoc, 0.4f, 0.7f, 1.0f, alpha);
+
+	            glDrawArrays(GL_LINE_STRIP, 0, vertCount);
+	            glBindVertexArray(0);
+	        }
+	    }
+	}
+	
+	//Projected orbits for new bodies
+	public void renderProjectedOrbit(Simulation sim) {
+		if (!bodyFactory.isVelocitySet() && !bodyFactory.isDragging()) { return; }
+
+		// Find the most massive body to use as the gravitational attractor
+	    Body attractor = null;
+	    for (Body b : sim.getBodies()) {
+	        if (attractor == null || b.mass > attractor.mass) {
+	            attractor = b;
+	        }
+	    }
+	    if (attractor == null) return;
+		
+	    // Create a ghost Body using the existing Body class
+	    double posX    = bodyFactory.getClickWorldX() / 1e-11;
+	    double posY    = bodyFactory.getClickWorldY() / 1e-11;
+	    Body ghost     = new Body(
+	        new Vector2D(posX, posY),
+	        new Vector2D(bodyFactory.getVelocityX(), bodyFactory.getVelocityY()),
+	        bodyFactory.pendingMass,
+	        bodyFactory.pendingRadius
+	    );
+	    
+	    // Compute initial acceleration toward attractor
+	    updateGhostAcceleration(ghost, attractor, sim.G, sim.epsilon);
+	    
+	    List<float[]> path = new ArrayList<>();
+	    path.add(new float[]{
+	        (float)(ghost.position.x * WORLD_SCALE),
+	        (float)(ghost.position.y * WORLD_SCALE)
+	    });
+	    
+	    for (int i = 0; i < ORBIT_PROJECTION_STEPS; i++) {
+	        // Reuse existing halfKick and position update from Body
+	        ghost.halfKick(sim.dt);
+	        ghost.position = ghost.position.add(ghost.velocity.scale(sim.dt));
+	        updateGhostAcceleration(ghost, attractor, sim.G, sim.epsilon);
+	        ghost.halfKick(sim.dt);
+
+	        path.add(new float[]{
+	            (float)(ghost.position.x * WORLD_SCALE),
+	            (float)(ghost.position.y * WORLD_SCALE)
+	        });
+
+	        if (ghost.position.magnitudeSquared() > 1e30) break;
+	    }
+	    
+	    if (path.size() < 2) return;
+	    float[] verts = new float[path.size() * 3];
+	    for (int i = 0; i < path.size(); i++) {
+	        verts[i * 3]     = path.get(i)[0];
+	        verts[i * 3 + 1] = path.get(i)[1];
+	        verts[i * 3 + 2] = 0.0f;
+	    }
+	    
+	    //bypass uploadAndDraw.  Having issues
+	    glBindVertexArray(vao);
+	    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
+	    FloatBuffer buf = MemoryUtil.memAllocFloat(verts.length);
+	    buf.put(verts).flip();
+	    glBufferData(GL_ARRAY_BUFFER, buf, GL_DYNAMIC_DRAW);
+	    MemoryUtil.memFree(buf);
+
+	    glVertexAttribPointer(0, 3, GL_FLOAT, false, 0, 0);
+	    glEnableVertexAttribArray(0);
+
+	    int colorLoc = glGetUniformLocation(shaderProgram, "uColor");
+	    glUniform4f(colorLoc, 0.2f, 1.0f, 0.4f, 0.4f);
+
+	    glDrawArrays(GL_LINE_STRIP, 0, path.size());
+	    glBindVertexArray(0);
+	}
+	
 	//vector rendering
 	private void renderVelocityVectors(List<Body> bodies) {
 		float[] verts = new float[bodies.size() * 6];
@@ -570,6 +723,7 @@ public class SimulationRenderer {
             verts[i * 6 + 3] = x1; verts[i * 6 + 4] = y1; verts[i * 6 + 5] = 0;
         }
         uploadAndDraw(verts, GL_LINES, 0.2f, 0.6f, 1.0f, 0.8f); // blue
+        
 	}
 	
 	private void renderAccelerationVectors(List<Body> bodies) {
@@ -584,6 +738,7 @@ public class SimulationRenderer {
             verts[i * 6 + 3] = x1; verts[i * 6 + 4] = y1; verts[i * 6 + 5] = 0;
         }
         uploadAndDraw(verts, GL_LINES, 1.0f, 0.4f, 0.2f, 0.8f); // orange
+        
     }
 	 
 	// Quad Tree Rendering
@@ -606,6 +761,7 @@ public class SimulationRenderer {
                 renderQuadTree(child);
             }
         }
+        
 	}
 	
 	//DRAWING CALLS ------------------------------------------------------------------------------------------------------------------------
@@ -656,7 +812,7 @@ public class SimulationRenderer {
 	    return verts;
 	}
 	
-	//COORDINATE CONVERSION ------------------------------------------------------------------------------------------------------------------------
+	//MATH / CORD CONVERSION ------------------------------------------------------------------------------------------------------------------------
 	private float[] worldToScreen(float worldX, float worldY) {
 		//build the same mvp the gpu uses
 		Matrix4f view = camera.getViewMatrix();
@@ -695,6 +851,15 @@ public class SimulationRenderer {
 	    return new float[]{ world.x, world.y };
 	}
 	
+	public void updateGhostAcceleration(Body ghost, Body attractor, double G, double epsilon) {
+		ghost.resetAcceleration();
+		Vector2D dir = attractor.position.subtract(ghost.position);
+		double dist = dir.magnitude();
+		double soft = Math.sqrt(dist * dist + epsilon * epsilon);
+		double mag = (G * attractor.mass) / (soft * soft * soft);
+		ghost.acceleration = dir.scale(mag);
+	}
+	
 	 
 	//GL HELPERS ------------------------------------------------------------------------------------------------------------------------
 	 
@@ -706,6 +871,9 @@ public class SimulationRenderer {
 			buf.put(verts).flip();
 			glBufferData(GL_ARRAY_BUFFER, buf, GL_DYNAMIC_DRAW);
 			MemoryUtil.memFree(buf);
+			
+			glVertexAttribPointer(0, 3, GL_FLOAT, false, 0, 0);
+		    glEnableVertexAttribArray(0);
 			
 			int colorLoc = glGetUniformLocation(shaderProgram, "uColor");
 			glUniform4f(colorLoc, r, g, b, a);
@@ -971,6 +1139,9 @@ public class SimulationRenderer {
             }
             if (key == GLFW_KEY_Q && action == GLFW_PRESS) {
                 showQuadTree = !showQuadTree;
+            }
+            if (key == GLFW_KEY_T && action == GLFW_PRESS) {
+                showTrails = !showTrails;
             }
         });
     }

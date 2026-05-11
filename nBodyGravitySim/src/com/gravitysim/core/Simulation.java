@@ -86,6 +86,17 @@ public class Simulation {
 		for (Body b : bodies) {
 			b.halfKick(dt);
 		}
+		
+		// Record trail positions for trackable bodies
+		for (Body b : bodies) {
+		    if (b.trackable) {
+//		    	System.out.println("adding trail for: " + b.getDisplayName());
+		        b.trail.addLast(b.position.copy());
+		        if (b.trail.size() > Body.TRAIL_LENGTH) {
+		            b.trail.removeFirst();
+		        }
+		    }
+		}
 	}
 	
 	private void computeAccelerations() {
@@ -99,14 +110,16 @@ public class Simulation {
 	public void reset() {
 		bodies.clear();
 		for (Body b : initialBodies) {
-			bodies.add(new Body(
+			Body copy = new Body(
 				new Vector2D(b.position.x, b.position.y),
 	            new Vector2D(b.velocity.x, b.velocity.y),
 				b.mass,
 				b.radius,
 				b.name,
 				b.trackable
-			)); 
+			); 
+			copy.trail.clear();
+			bodies.add(copy);
 		}
 		paused = false;
 		tree.build(bodies);

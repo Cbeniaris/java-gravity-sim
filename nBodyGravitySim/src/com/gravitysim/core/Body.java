@@ -1,5 +1,8 @@
 package com.gravitysim.core;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
+
 public class Body {
 	public Vector2D position;
 	public Vector2D velocity;
@@ -8,6 +11,10 @@ public class Body {
 	public double radius;
 	public String name;
 	public boolean trackable = false;
+	public Deque<Vector2D> trail = new ArrayDeque<>();
+	
+	//trai limit for displaying bodies' path behind them.  Smaller for better performance vs larger longer trails
+	public static final int TRAIL_LENGTH = 800;
 	
 	public Body(Vector2D position, Vector2D velocity, double mass, double radius, String name, boolean trackable) {
 		this.position = position;
