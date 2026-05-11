@@ -32,6 +32,17 @@ public class Simulation {
 		bodies.add(b);
 	}
 	
+	public void addBodyLive(Body b) {
+		bodies.add(b);
+//		if (b.trackable) {
+//    		System.out.println("Adding Body: " + b.name);
+//    		System.out.println("x: " + b.position.x);
+//    		System.out.println("y: " + b.position.y);
+//    	}
+		tree.build(bodies);
+		computeAccelerations();
+	}
+	
 	public void initialize() {
 		// Store a deep copy of initial state for reset
 		initialBodies = new ArrayList<>();
@@ -40,8 +51,10 @@ public class Simulation {
 	            new Vector2D(b.position.x, b.position.y),
 	            new Vector2D(b.velocity.x, b.velocity.y),
 	            b.mass, 
-	            b.radius
-	        ));
+	            b.radius,
+	            b.name,
+	            b.trackable
+	        ));    	
 	    }
 	    tree.build(bodies);
 	    computeAccelerations();
@@ -90,7 +103,9 @@ public class Simulation {
 				new Vector2D(b.position.x, b.position.y),
 	            new Vector2D(b.velocity.x, b.velocity.y),
 				b.mass,
-				b.radius
+				b.radius,
+				b.name,
+				b.trackable
 			)); 
 		}
 		paused = false;
