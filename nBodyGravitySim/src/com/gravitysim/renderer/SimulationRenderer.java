@@ -1230,7 +1230,7 @@ public class SimulationRenderer {
         if (path == null) {
             return null;
         }
-
+ 
         return new File(path);
     }
 }
