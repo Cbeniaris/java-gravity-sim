@@ -405,16 +405,49 @@ public class SimulationRenderer {
 	}
 
 	public void renderConfirmationWindow() {
+		// Configurable padding from screen edge
+	    final float SCREEN_EDGE_BUFFER = 20.0f;
+		
+	   // Window size
+	    final float WINDOW_WIDTH  = 180.0f;
+	    final float WINDOW_HEIGHT = 70.0f;
+	    
 		//small pop up near click position
 		float wx = bodyFactory.getClickScreenX();
 		float wy = bodyFactory.getClickScreenY();
-		ImGui.setNextWindowPos(wx+10, wy+10, imgui.flag.ImGuiCond.Always);
-		ImGui.setNextWindowSize(180,70, imgui.flag.ImGuiCond.Always);
+		
+		//get viewport size
+		// Get viewport/display size
+	    float displayWidth  = ImGui.getIO().getDisplaySizeX();
+	    float displayHeight = ImGui.getIO().getDisplaySizeY();
+		
+	  // Prevent popup from going off the right side
+	    if (wx + WINDOW_WIDTH > displayWidth - SCREEN_EDGE_BUFFER) {
+	        wx = displayWidth - WINDOW_WIDTH - SCREEN_EDGE_BUFFER;
+	    }
+
+	    // Optional: prevent popup from going off bottom edge
+	    if (wy + WINDOW_HEIGHT > displayHeight - SCREEN_EDGE_BUFFER) {
+	        wy = displayHeight - WINDOW_HEIGHT - SCREEN_EDGE_BUFFER;
+	    }
+
+	    // prevent negative positions as well
+	    if (wx < SCREEN_EDGE_BUFFER) {
+	        wx = SCREEN_EDGE_BUFFER;
+	    }
+
+	    if (wy < SCREEN_EDGE_BUFFER) {
+	        wy = SCREEN_EDGE_BUFFER;
+	    }
+	    
+	    ImGui.setNextWindowPos(wx+10, wy+10, imgui.flag.ImGuiCond.Always);
+		ImGui.setNextWindowSize(WINDOW_WIDTH,WINDOW_HEIGHT, imgui.flag.ImGuiCond.Always);
 		ImGui.begin("##confirm_place",
 			imgui.flag.ImGuiWindowFlags.NoTitleBar |
             imgui.flag.ImGuiWindowFlags.NoResize |
             imgui.flag.ImGuiWindowFlags.NoMove |
             imgui.flag.ImGuiWindowFlags.NoScrollbar);
+		
 		ImGui.text("Create new body here?");
 		ImGui.spacing();
 		if (ImGui.button("Confirm", 78, 22)) {
@@ -1042,24 +1075,28 @@ public class SimulationRenderer {
         });
 
         glfwSetScrollCallback(windowHandle, (win, dx, dy) -> {
-            // Get mouse position in screen pixels
-            double[] mx = new double[1], my = new double[1];
-            glfwGetCursorPos(win, mx, my);
-
-            // Convert mouse screen position to world space BEFORE zooming
-            float worldBeforeX = screenToWorld((float)mx[0], (float)my[0])[0];
-            float worldBeforeY = screenToWorld((float)mx[0], (float)my[0])[1];
-
-            // Apply zoom
-            camera.zoom(dy > 0 ? 1.1f : 0.9f);
-
-            // Convert same screen position to world space AFTER zooming
-            float worldAfterX = screenToWorld((float)mx[0], (float)my[0])[0];
-            float worldAfterY = screenToWorld((float)mx[0], (float)my[0])[1];
-
-            // Pan camera by the difference to keep the point under the mouse fixed
-            camera.x -= (worldAfterX - worldBeforeX);
-            camera.y -= (worldAfterY - worldBeforeY);
+        	
+        	//Dont zoom in and out if youre over a gui panel
+        	if (!ImGui.isWindowHovered(imgui.flag.ImGuiHoveredFlags.AnyWindow)) {
+	            // Get mouse position in screen pixels
+	            double[] mx = new double[1], my = new double[1];
+	            glfwGetCursorPos(win, mx, my);
+	
+	            // Convert mouse screen position to world space BEFORE zooming
+	            float worldBeforeX = screenToWorld((float)mx[0], (float)my[0])[0];
+	            float worldBeforeY = screenToWorld((float)mx[0], (float)my[0])[1];
+	
+	            // Apply zoom
+	            camera.zoom(dy > 0 ? 1.1f : 0.9f);
+	
+	            // Convert same screen position to world space AFTER zooming
+	            float worldAfterX = screenToWorld((float)mx[0], (float)my[0])[0];
+	            float worldAfterY = screenToWorld((float)mx[0], (float)my[0])[1];
+	
+	            // Pan camera by the difference to keep the point under the mouse fixed
+	            camera.x -= (worldAfterX - worldBeforeX);
+	            camera.y -= (worldAfterY - worldBeforeY);
+        	}
         });
 
         glfwSetMouseButtonCallback(windowHandle, (win, button, action, mods) -> {
