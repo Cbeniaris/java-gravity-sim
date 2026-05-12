@@ -24,13 +24,13 @@ A real-time gravitational simulation of the solar system built in Java using Ope
 - Space background image rendered behind the simulation
 - Per-body naming, trackable flag, mass, and radius configurable at creation time
 - Debug overlays for velocity vectors, acceleration vectors, and quadtree grid visualization
+- File explorer for saving and loading using TinyFd
 
 ---
 
 ## Planned Features
 
 - Texturing of bodies dynamically
-- File explorer for save/load
 
 ---
 
@@ -135,6 +135,7 @@ src/
 | JOML | 1.10.5 | Matrix and vector math for OpenGL |
 | ImGui-java | 1.86.11 | Runtime control panel and debug UI |
 | Gson | 2.10.1 | JSON serialization for save/load |
+| TinyFD | 3.3.4 | File explorer for saving and loading |
 
 ---
 

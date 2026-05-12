@@ -82,6 +82,20 @@
       <classifier>${lwjgl.natives}</classifier>
     </dependency>
     
+    <!-- LWJGL TinyFD -->
+	<dependency>
+	    <groupId>org.lwjgl</groupId>
+	    <artifactId>lwjgl-tinyfd</artifactId>
+	    <version>${lwjgl.version}</version>
+	</dependency>
+	
+	<dependency>
+	    <groupId>org.lwjgl</groupId>
+	    <artifactId>lwjgl-tinyfd</artifactId>
+	    <version>${lwjgl.version}</version>
+	    <classifier>${lwjgl.natives}</classifier>
+	</dependency>
+    
     <!-- GSON -->
     <dependency>
 	    <groupId>com.google.code.gson</groupId>

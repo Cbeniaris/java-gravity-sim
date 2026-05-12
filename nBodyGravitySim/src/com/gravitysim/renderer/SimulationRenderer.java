@@ -7,9 +7,13 @@ import com.gravitysim.core.SimulationIO;
 import com.gravitysim.core.Vector2D;
 import com.gravitysim.tree.*;
 import org.joml.Matrix4f;
+import org.lwjgl.PointerBuffer;
 import org.lwjgl.opengl.*;
+import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
+import org.lwjgl.util.tinyfd.TinyFileDialogs;
 
+import java.io.File;
 import java.nio.FloatBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -259,29 +263,36 @@ public class SimulationRenderer {
         }
         
         // Save and Load
-        ImGui.inputText("File", saveFilePath);
+        ImGui.spacing();
+        ImGui.separator();
+        ImGui.textDisabled("SAVE / LOAD");
+        ImGui.separator();
         ImGui.spacing();
         
         if (ImGui.button("Save",84, 24)) {
-        	try {
-        		String path = "saves/" + saveFilePath.get() + ".json";
-        		new java.io.File("saves").mkdirs();
-        		SimulationIO.save(sim,  path);
-        		saveStatusMessage = "Saved: " + path;
-        	} catch (Exception e){
-        		saveStatusMessage = "Save Failed: " + e.getMessage();
-        	}
+        	java.io.File file = openFileChooser(true);
+        	if (file != null) {
+	        	try {
+	        		file.getParentFile().mkdirs();
+	                SimulationIO.save(sim, file.getAbsolutePath());
+	                saveStatusMessage = "Saved: " + file.getName();
+	        	} catch (Exception e){
+	        		saveStatusMessage = "Save Failed: " + e.getMessage();
+	        	}
+	        }
         }
         
         ImGui.sameLine();
         if (ImGui.button("Load", 84, 24)) {
-            try {
-                String path = "saves/" + saveFilePath.get() + ".json";
-                SimulationIO.load(sim, path);
-                saveStatusMessage = "Loaded: " + path;
-            } catch (Exception e) {
-                saveStatusMessage = "Load failed: " + e.getMessage();
-            }
+    	 java.io.File file = openFileChooser(false);
+    	    if (file != null) {
+	            try {
+	            	SimulationIO.load(sim, file.getAbsolutePath());
+	                saveStatusMessage = "Loaded: " + file.getName();
+	            } catch (Exception e) {
+	                saveStatusMessage = "Load failed: " + e.getMessage();
+	            }
+	        }
         }
         ImGui.sameLine();
         if (ImGui.button("Clear", 84, 24)) {
@@ -1188,6 +1199,40 @@ public class SimulationRenderer {
         org.lwjgl.stb.STBImage.stbi_image_free(image);
         return textureId;
     }    
+    
+    //File Explorerer ------------------------------------------------------------------------------------------------------------------------
+
+    private java.io.File openFileChooser(boolean saveMode) {
+        String path;
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+	        PointerBuffer filters = stack.mallocPointer(1);
+	        filters.put(stack.UTF8("*.json"));
+	        filters.flip();
+	        
+	        if (saveMode) {
+	            path = TinyFileDialogs.tinyfd_saveFileDialog(
+	                "Save Simulation",
+	                "saves/simulation.json",
+	                filters,
+	                "Simulation Files (*.json)"
+	            );
+	        } else {
+	            path = TinyFileDialogs.tinyfd_openFileDialog(
+	                "Load Simulation",
+	                "saves/simulation.json",
+	                filters,
+	                "Simulation Files (*.json)",
+	                false
+	            );
+	        }
+        }
+
+        if (path == null) {
+            return null;
+        }
+
+        return new File(path);
+    }
 }
 
 
