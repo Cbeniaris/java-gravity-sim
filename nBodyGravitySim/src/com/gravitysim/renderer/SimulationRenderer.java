@@ -1203,6 +1203,13 @@ public class SimulationRenderer {
     //File Explorerer ------------------------------------------------------------------------------------------------------------------------
 
     private java.io.File openFileChooser(boolean saveMode) {
+    	
+    	// Ensure saves directory exists
+        java.io.File savesDir = new java.io.File("saves");
+        if (!savesDir.exists()) {
+            savesDir.mkdirs();
+        }
+    	
         String path;
         try (MemoryStack stack = MemoryStack.stackPush()) {
 	        PointerBuffer filters = stack.mallocPointer(1);
