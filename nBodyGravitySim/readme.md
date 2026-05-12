@@ -24,7 +24,7 @@ A real-time gravitational simulation of the solar system built in Java using Ope
 - Space background image rendered behind the simulation
 - Per-body naming, trackable flag, mass, and radius configurable at creation time
 - Debug overlays for velocity vectors, acceleration vectors, and quadtree grid visualization
-- File explorer for saving and loading using TinyFd
+- File explorer for saving and loading using TinyFd 
 
 ---
 
