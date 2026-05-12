@@ -1226,8 +1226,7 @@ public class SimulationRenderer {
 	            );
 	        }
         }
-
-        //return null path does not exist
+        
         if (path == null) {
             return null;
         }
