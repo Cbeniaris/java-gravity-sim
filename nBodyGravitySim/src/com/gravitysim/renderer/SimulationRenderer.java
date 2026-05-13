@@ -85,7 +85,7 @@ public class SimulationRenderer {
 	private static final float TRACKING_THRESHOLD_PX = 8f;
 	
 	//init
-	public void init() {
+	public void init(Simulation sim) {
 		// Force X11 backend instead of Wayland
 		org.lwjgl.glfw.GLFW.glfwInitHint(
 		    org.lwjgl.glfw.GLFW.GLFW_PLATFORM, 
@@ -106,7 +106,7 @@ public class SimulationRenderer {
 		
 		camera = new Camera();
 		
-		setupCallbacks();
+		setupCallbacks(sim);
 		setupShaders();
 		setupBuffers();
 		
@@ -316,13 +316,13 @@ public class SimulationRenderer {
         ImBoolean trails = new ImBoolean(showTrails);
         
         
-        if (ImGui.checkbox("Velocity Vectors  [V]", velVec))
+        if (ImGui.checkbox("Velocity Vectors", velVec))
             showVelocityVectors = velVec.get();
-        if (ImGui.checkbox("Acceleration Vectors  [A]", accVec))
+        if (ImGui.checkbox("Acceleration Vectors", accVec))
             showAccelerationVectors = accVec.get();
-        if (ImGui.checkbox("Quadtree Grid  [Q]", qtree))
+        if (ImGui.checkbox("Quadtree Grid", qtree))
             showQuadTree = qtree.get();
-        if (ImGui.checkbox("Orbital Trails [T]", trails))
+        if (ImGui.checkbox("Orbital Trails", trails))
             showTrails = trails.get();
        
         //Stats
@@ -1067,7 +1067,7 @@ public class SimulationRenderer {
     }
     
     //INPUT CALLBACKS ------------------------------------------------------------------------------------------------------------------------
-    private void setupCallbacks() {
+    private void setupCallbacks(Simulation sim) {
         glfwSetFramebufferSizeCallback(windowHandle, (win, w, h) -> {
             windowWidth  = w;
             windowHeight = h;
@@ -1179,18 +1179,22 @@ public class SimulationRenderer {
             if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
                 glfwSetWindowShouldClose(win, true);
             }
-            if (key == GLFW_KEY_V && action == GLFW_PRESS) {
-                showVelocityVectors = !showVelocityVectors;
+//            if (key == GLFW_KEY_V && action == GLFW_PRESS) {
+//                showVelocityVectors = !showVelocityVectors;
+//            }
+//            if (key == GLFW_KEY_A && action == GLFW_PRESS) {
+//                showAccelerationVectors = !showAccelerationVectors;
+//            }
+//            if (key == GLFW_KEY_Q && action == GLFW_PRESS) {
+//                showQuadTree = !showQuadTree;
+//            }
+//            if (key == GLFW_KEY_T && action == GLFW_PRESS) {
+//                showTrails = !showTrails;
+//            }
+            if (key == GLFW_KEY_SPACE && action == GLFW_PRESS) {
+                sim.togglePause();
             }
-            if (key == GLFW_KEY_A && action == GLFW_PRESS) {
-                showAccelerationVectors = !showAccelerationVectors;
-            }
-            if (key == GLFW_KEY_Q && action == GLFW_PRESS) {
-                showQuadTree = !showQuadTree;
-            }
-            if (key == GLFW_KEY_T && action == GLFW_PRESS) {
-                showTrails = !showTrails;
-            }
+            
         });
     }
     

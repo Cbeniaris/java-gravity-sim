@@ -182,10 +182,6 @@ Or from Eclipse: right-click `Main.java` -> Run As -> Java Application. Ensure `
 | Right-click drag | Pan camera |  
 | Left click | Place new body (opens confirmation window) |  
 | Left click + drag | Set initial velocity for new body |  
-| `V` | Toggle velocity vectors |  
-| `A` | Toggle acceleration vectors |  
-| `Q` | Toggle quadtree grid overlay |  
-| `T` | Toggle orbital trails |  
 | `Escape` | Exit |    
 
 ---
